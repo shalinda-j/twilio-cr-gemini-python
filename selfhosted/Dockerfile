@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+# Flush stdout/stderr immediately so docker compose logs show in real time.
+ENV PYTHONUNBUFFERED=1
+
 # ffmpeg/libsndfile help audio libs; build tools for any wheels that compile.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg libsndfile1 build-essential \
