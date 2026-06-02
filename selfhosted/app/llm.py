@@ -1,5 +1,11 @@
 # llm.py - Gemini wrapper. One chat session per phone call keeps context.
-import google.generativeai as genai
+import warnings
+
+# The google.generativeai package prints a noisy deprecation FutureWarning on
+# import; it still works fine. Silence it so container logs stay clean.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import google.generativeai as genai
 
 from . import config
 

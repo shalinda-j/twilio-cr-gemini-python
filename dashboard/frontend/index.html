@@ -5,37 +5,71 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voice Assistant Console</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config = { darkMode: 'class' }</script>
+  <script>
+    tailwind.config = { darkMode: 'class', theme: { extend: {
+      fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+      colors: { brand: { 400:'#818cf8', 500:'#6366f1', 600:'#4f46e5' } }
+    }}}
+  </script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     [x-cloak]{display:none!important}
-    ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#334155;border-radius:8px}
-    .inp{width:100%;padding:.5rem .75rem;border-radius:.5rem;background:#1e293b;border:1px solid #334155;outline:none;font-size:.875rem}
-    .inp:focus{border-color:#6366f1}
-    .btn{padding:.5rem .9rem;border-radius:.5rem;font-size:.875rem;font-weight:500;background:#6366f1}
-    .btn:hover{background:#818cf8}
-    .card{background:#0f172a;border:1px solid #1e293b;border-radius:.75rem}
+    body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;
+      background:radial-gradient(1200px 600px at 80% -10%,rgba(99,102,241,.12),transparent 60%),#020617}
+    ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:8px}
+    .glass{background:rgba(15,23,42,.7);backdrop-filter:blur(12px)}
+    .card{background:linear-gradient(180deg,rgba(30,41,59,.5),rgba(15,23,42,.5));border:1px solid rgba(51,65,85,.6);border-radius:1rem}
+    .inp{width:100%;padding:.6rem .8rem;border-radius:.6rem;background:#0b1220;border:1px solid #233047;color:#e2e8f0;font-size:.875rem;transition:.15s}
+    .inp:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+    .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem .95rem;border-radius:.6rem;font-size:.875rem;font-weight:600;
+      background:linear-gradient(180deg,#6366f1,#4f46e5);color:#fff;transition:.15s;box-shadow:0 4px 14px rgba(79,70,229,.3)}
+    .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+    .btn-ghost{background:#1e293b;box-shadow:none}.btn-ghost:hover{background:#334155}
+    .navi{position:relative;transition:.15s}
+    .navi.active{background:rgba(99,102,241,.14);color:#c7d2fe}
+    .navi.active::before{content:"";position:absolute;left:0;top:18%;height:64%;width:3px;border-radius:3px;background:#6366f1}
+    @keyframes slideup{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .toast{animation:slideup .2s ease-out}
+    .lift{transition:.18s}.lift:hover{transform:translateY(-2px);border-color:rgba(99,102,241,.5)}
+    .navi svg{width:100%;height:100%;display:block}
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 antialiased">
+<body class="text-slate-100 antialiased">
 <div x-data="app()" x-init="init()" x-cloak>
+
+  <!-- top loading bar -->
+  <div x-show="loading" class="fixed top-0 inset-x-0 h-0.5 z-50 bg-brand-500 animate-pulse"></div>
+
+  <!-- toasts -->
+  <div class="fixed bottom-4 right-4 z-50 space-y-2">
+    <template x-for="t in toasts" :key="t.id">
+      <div class="toast px-4 py-2.5 rounded-xl text-sm shadow-lg border flex items-center gap-2"
+           :class="t.type==='error' ? 'bg-red-500/15 border-red-500/40 text-red-200' : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'">
+        <span x-text="t.type==='error' ? '⚠️' : '✓'"></span><span x-text="t.msg"></span>
+      </div>
+    </template>
+  </div>
 
   <!-- ============ LOGIN ============ -->
   <template x-if="!token">
     <div class="min-h-screen flex items-center justify-center p-4">
-      <div class="w-full max-w-sm card p-8">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="h-10 w-10 rounded-xl bg-indigo-500 flex items-center justify-center text-xl">🎙️</div>
-          <h1 class="text-xl font-semibold">Voice Assistant</h1>
+      <div class="w-full max-w-sm card p-8 shadow-2xl">
+        <div class="flex flex-col items-center text-center mb-7">
+          <div class="h-14 w-14 rounded-2xl flex items-center justify-center text-2xl mb-3"
+               style="background:linear-gradient(135deg,#6366f1,#a855f7)">🎙️</div>
+          <h1 class="text-xl font-bold">Voice Assistant Console</h1>
+          <p class="text-sm text-slate-400 mt-1">Sign in to manage your AI calls</p>
         </div>
         <form @submit.prevent="login()">
-          <label class="block text-sm text-slate-400 mb-1">Email</label>
-          <input x-model="loginForm.email" type="email" required class="inp mb-4" />
-          <label class="block text-sm text-slate-400 mb-1">Password</label>
-          <input x-model="loginForm.password" type="password" required class="inp mb-5" />
-          <button class="btn w-full py-2.5">Sign in</button>
-          <p x-show="error" x-text="error" class="text-red-400 text-sm mt-3"></p>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5">EMAIL</label>
+          <input x-model="loginForm.email" type="email" required class="inp mb-4" placeholder="admin@example.com" />
+          <label class="block text-xs font-medium text-slate-400 mb-1.5">PASSWORD</label>
+          <input x-model="loginForm.password" type="password" required class="inp mb-5" placeholder="••••••••" />
+          <button class="btn w-full justify-center py-2.5" :disabled="busy" x-text="busy ? 'Signing in…' : 'Sign in'"></button>
+          <p x-show="error" x-text="error" class="text-red-400 text-sm mt-3 text-center"></p>
         </form>
       </div>
     </div>
@@ -45,65 +79,82 @@
   <template x-if="token">
     <div class="min-h-screen flex">
       <!-- Sidebar -->
-      <aside class="fixed lg:static z-30 inset-y-0 left-0 w-64 bg-slate-900 border-r border-slate-800 transform transition-transform lg:translate-x-0"
+      <aside class="fixed lg:static z-30 inset-y-0 left-0 w-64 glass border-r border-slate-800 flex flex-col transform transition-transform lg:translate-x-0"
              :class="sidebar ? 'translate-x-0' : '-translate-x-full'">
-        <div class="px-4 py-4 flex items-center gap-2 border-b border-slate-800">
-          <span class="text-lg">🎙️</span>
-          <span class="font-semibold truncate" x-text="me?.company?.name || 'Console'"></span>
+        <div class="px-5 py-5 flex items-center gap-2.5 border-b border-slate-800">
+          <div class="h-9 w-9 rounded-xl flex items-center justify-center text-lg" style="background:linear-gradient(135deg,#6366f1,#a855f7)">🎙️</div>
+          <div class="min-w-0">
+            <div class="font-bold leading-tight truncate" x-text="me?.company?.name || 'Console'"></div>
+            <div class="text-[11px] text-slate-500">Voice AI Platform</div>
+          </div>
         </div>
-        <nav class="p-3 space-y-1">
+        <nav class="p-3 space-y-1 flex-1 overflow-y-auto">
           <template x-for="item in menu" :key="item.id">
             <button @click="go(item.id)"
-                    class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left"
-                    :class="view===item.id ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-300 hover:bg-slate-800'">
-              <span x-text="item.icon"></span><span x-text="item.label"></span>
+                    class="navi w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left text-slate-400 hover:text-slate-100 hover:bg-slate-800/60"
+                    :class="view===item.id && 'active'">
+              <span class="h-5 w-5 shrink-0" x-html="item.icon"></span>
+              <span class="font-medium" x-text="item.label"></span>
             </button>
           </template>
         </nav>
-        <div class="absolute bottom-0 w-full p-3 border-t border-slate-800">
-          <div class="flex items-center gap-2 text-xs text-emerald-400 mb-2 px-1">
+        <div class="p-3 border-t border-slate-800">
+          <div class="flex items-center gap-2 text-xs mb-3 px-1">
             <span class="h-2 w-2 rounded-full" :class="wsConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'"></span>
-            <span x-text="wsConnected ? 'Live' : 'Offline'"></span>
+            <span :class="wsConnected ? 'text-emerald-400' : 'text-slate-500'" x-text="wsConnected ? 'Live · connected' : 'Reconnecting…'"></span>
           </div>
-          <button @click="logout()" class="w-full px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">Logout</button>
+          <div class="flex items-center gap-2.5 px-1 mb-3">
+            <div class="h-8 w-8 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-xs font-bold" x-text="initials"></div>
+            <div class="min-w-0"><div class="text-xs text-slate-300 truncate" x-text="me?.email"></div>
+              <div class="text-[11px] text-slate-500 capitalize" x-text="me?.role"></div></div>
+          </div>
+          <button @click="logout()" class="btn btn-ghost w-full justify-center text-slate-300">Logout</button>
         </div>
       </aside>
       <div x-show="sidebar" @click="sidebar=false" class="fixed inset-0 bg-black/50 z-20 lg:hidden"></div>
 
       <!-- Main -->
       <div class="flex-1 min-w-0">
-        <header class="sticky top-0 z-10 bg-slate-900/80 backdrop-blur border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+        <header class="sticky top-0 z-10 glass border-b border-slate-800 px-4 lg:px-6 py-3.5 flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <button @click="sidebar=!sidebar" class="lg:hidden text-slate-300">☰</button>
-            <h2 class="font-semibold capitalize" x-text="menu.find(m=>m.id===view)?.label"></h2>
+            <button @click="sidebar=!sidebar" class="lg:hidden text-slate-300 text-xl">☰</button>
+            <div>
+              <h2 class="font-bold leading-tight" x-text="menu.find(m=>m.id===view)?.label"></h2>
+              <p class="text-xs text-slate-500" x-text="menu.find(m=>m.id===view)?.sub"></p>
+            </div>
           </div>
-          <span class="text-sm text-slate-400 hidden sm:inline" x-text="me?.email"></span>
+          <button @click="go(view)" class="btn btn-ghost text-slate-300 text-xs">↻ Refresh</button>
         </header>
 
-        <main class="p-4 lg:p-6 space-y-6 max-w-5xl">
+        <main class="p-4 lg:p-6 space-y-6 max-w-6xl">
 
           <!-- ===== OVERVIEW ===== -->
           <template x-if="view==='overview'">
             <div class="space-y-6">
-              <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <template x-for="c in [
-                    {l:'Active calls',v:stats.active_calls,a:'text-emerald-400'},
-                    {l:'Calls today',v:stats.today_calls,a:'text-indigo-400'},
-                    {l:'Total calls',v:stats.total_calls,a:'text-sky-400'},
-                    {l:'Total minutes',v:stats.total_minutes,a:'text-amber-400'}]" :key="c.l">
-                  <div class="card p-4"><div class="text-xs text-slate-400" x-text="c.l"></div>
-                    <div class="text-2xl font-bold mt-1" :class="c.a" x-text="c.v ?? '–'"></div></div>
+              <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <template x-for="c in cards" :key="c.l">
+                  <div class="card lift p-4">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs text-slate-400" x-text="c.l"></span>
+                      <span class="h-8 w-8 rounded-lg flex items-center justify-center text-sm" :style="c.bg" x-html="c.icon"></span>
+                    </div>
+                    <div class="text-2xl font-extrabold mt-2" x-text="(stats[c.k] ?? '–')"></div>
+                  </div>
                 </template>
               </div>
               <div class="grid lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 card p-4"><div class="text-sm font-medium mb-3">Calls (last 7 days)</div>
-                  <canvas id="chart" height="120"></canvas></div>
-                <div class="card p-4"><div class="text-sm font-medium mb-3">Live activity</div>
-                  <div class="space-y-2 max-h-64 overflow-y-auto">
+                <div class="lg:col-span-2 card p-5">
+                  <div class="text-sm font-semibold mb-4">Calls · last 7 days</div>
+                  <canvas id="chart" height="120"></canvas>
+                </div>
+                <div class="card p-5">
+                  <div class="text-sm font-semibold mb-4">Live activity</div>
+                  <div class="space-y-2 max-h-72 overflow-y-auto">
                     <template x-for="f in liveFeed" :key="f.id">
-                      <div class="text-sm bg-slate-800/60 rounded-lg px-3 py-2" x-text="f.text"></div></template>
-                    <p x-show="liveFeed.length===0" class="text-sm text-slate-500">Waiting for calls…</p>
-                  </div></div>
+                      <div class="text-sm bg-slate-800/50 rounded-lg px-3 py-2 toast" x-text="f.text"></div></template>
+                    <div x-show="liveFeed.length===0" class="text-sm text-slate-500 text-center py-8">⏳ Waiting for calls…</div>
+                  </div>
+                </div>
               </div>
             </div>
           </template>
@@ -112,121 +163,126 @@
           <template x-if="view==='calls'">
             <div class="card overflow-hidden">
               <div class="overflow-x-auto"><table class="w-full text-sm">
-                <thead class="text-slate-400 text-left"><tr class="border-b border-slate-800">
-                  <th class="px-4 py-2 font-medium">Caller</th><th class="px-4 py-2 font-medium">Status</th>
-                  <th class="px-4 py-2 font-medium hidden sm:table-cell">Lang</th>
-                  <th class="px-4 py-2 font-medium hidden sm:table-cell">Turns</th>
-                  <th class="px-4 py-2 font-medium hidden md:table-cell">Duration</th>
-                  <th class="px-4 py-2 font-medium hidden md:table-cell">Started</th></tr></thead>
+                <thead class="text-slate-400 text-left text-xs uppercase tracking-wide">
+                  <tr class="border-b border-slate-800">
+                    <th class="px-5 py-3 font-semibold">Caller</th><th class="px-5 py-3 font-semibold">Status</th>
+                    <th class="px-5 py-3 font-semibold hidden sm:table-cell">Lang</th>
+                    <th class="px-5 py-3 font-semibold hidden sm:table-cell">Turns</th>
+                    <th class="px-5 py-3 font-semibold hidden md:table-cell">Duration</th>
+                    <th class="px-5 py-3 font-semibold hidden md:table-cell">Started</th></tr></thead>
                 <tbody>
                   <template x-for="c in calls" :key="c.id">
-                    <tr class="border-b border-slate-800/60 hover:bg-slate-800/40 cursor-pointer" @click="openCall(c.id)">
-                      <td class="px-4 py-2" x-text="c.caller || 'Unknown'"></td>
-                      <td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs"
-                          :class="c.status==='in_progress'?'bg-emerald-500/20 text-emerald-300':(c.status==='completed'?'bg-slate-700 text-slate-300':'bg-red-500/20 text-red-300')"
-                          x-text="c.status"></span></td>
-                      <td class="px-4 py-2 hidden sm:table-cell uppercase" x-text="c.language||'–'"></td>
-                      <td class="px-4 py-2 hidden sm:table-cell" x-text="c.turns"></td>
-                      <td class="px-4 py-2 hidden md:table-cell" x-text="fmtDur(c.duration_seconds)"></td>
-                      <td class="px-4 py-2 hidden md:table-cell text-slate-400" x-text="fmtTime(c.started_at)"></td>
+                    <tr class="border-b border-slate-800/50 hover:bg-slate-800/40 cursor-pointer transition" @click="openCall(c.id)">
+                      <td class="px-5 py-3 font-medium" x-text="c.caller || 'Unknown'"></td>
+                      <td class="px-5 py-3"><span class="px-2.5 py-1 rounded-full text-xs font-medium"
+                          :class="c.status==='in_progress'?'bg-emerald-500/15 text-emerald-300':(c.status==='completed'?'bg-slate-700/60 text-slate-300':'bg-red-500/15 text-red-300')"
+                          x-text="c.status==='in_progress'?'live':c.status"></span></td>
+                      <td class="px-5 py-3 hidden sm:table-cell uppercase text-slate-400" x-text="c.language||'–'"></td>
+                      <td class="px-5 py-3 hidden sm:table-cell" x-text="c.turns"></td>
+                      <td class="px-5 py-3 hidden md:table-cell" x-text="fmtDur(c.duration_seconds)"></td>
+                      <td class="px-5 py-3 hidden md:table-cell text-slate-400" x-text="fmtTime(c.started_at)"></td>
                     </tr></template>
-                  <tr x-show="calls.length===0"><td colspan="6" class="px-4 py-6 text-center text-slate-500">No calls yet</td></tr>
+                  <tr x-show="calls.length===0"><td colspan="6" class="px-5 py-12 text-center text-slate-500">📭 No calls yet</td></tr>
                 </tbody></table></div>
             </div>
           </template>
 
           <!-- ===== NUMBERS ===== -->
           <template x-if="view==='numbers'">
-            <div class="card p-4">
-              <form @submit.prevent="addNumber()" class="grid sm:grid-cols-4 gap-2 mb-4">
+            <div class="card p-5">
+              <form @submit.prevent="addNumber()" class="grid sm:grid-cols-4 gap-2.5 mb-5">
                 <input x-model="f.number.number" placeholder="DID e.g. 0112000000" required class="inp" />
                 <input x-model="f.number.label" placeholder="Label" class="inp" />
                 <input x-model="f.number.provider" placeholder="Provider" class="inp" />
-                <button class="btn">Add number</button>
+                <button class="btn justify-center">+ Add number</button>
               </form>
               <template x-for="n in numbers" :key="n.id">
-                <div class="flex items-center justify-between py-2 border-b border-slate-800/60">
-                  <div><span class="font-mono" x-text="n.number"></span>
-                    <span class="text-slate-500 text-sm" x-show="n.label" x-text="' · '+n.label"></span></div>
-                  <button @click="delNumber(n.id)" class="text-red-400 text-sm hover:text-red-300">Delete</button>
+                <div class="flex items-center justify-between py-2.5 border-b border-slate-800/50">
+                  <div class="flex items-center gap-3">
+                    <span class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center">#️⃣</span>
+                    <div><span class="font-mono font-medium" x-text="n.number"></span>
+                      <span class="text-slate-500 text-sm" x-show="n.label" x-text="' · '+n.label"></span></div></div>
+                  <button @click="delNumber(n.id)" class="text-slate-500 hover:text-red-400 text-sm">Delete</button>
                 </div></template>
-              <p x-show="numbers.length===0" class="text-sm text-slate-500">No numbers. Add your SIP trunk DID.</p>
+              <div x-show="numbers.length===0" class="text-sm text-slate-500 text-center py-8">No numbers yet — add your SIP trunk DID.</div>
             </div>
           </template>
 
-          <!-- ===== PROVIDERS (SIP) ===== -->
+          <!-- ===== PROVIDERS ===== -->
           <template x-if="view==='providers'">
-            <div class="card p-4">
-              <form @submit.prevent="addProvider()" class="grid sm:grid-cols-2 gap-2 mb-4">
+            <div class="card p-5">
+              <form @submit.prevent="addProvider()" class="grid sm:grid-cols-2 gap-2.5 mb-5">
                 <input x-model="f.provider.name" placeholder="Name (e.g. MyCarrier)" required class="inp" />
                 <input x-model="f.provider.host" placeholder="SIP host (sip.provider.com)" class="inp" />
-                <input x-model="f.provider.username" placeholder="Username" class="inp" />
+                <input x-model="f.provider.username" placeholder="Username (blank = IP-based)" class="inp" />
                 <input x-model="f.provider.password" type="password" placeholder="Password" class="inp" />
                 <input x-model="f.provider.notes" placeholder="Notes" class="inp sm:col-span-2" />
-                <button class="btn sm:col-span-2">Add provider</button>
+                <button class="btn justify-center sm:col-span-2">+ Add provider</button>
               </form>
               <template x-for="p in providers" :key="p.id">
-                <div class="flex items-center justify-between py-2 border-b border-slate-800/60">
-                  <div><span class="font-medium" x-text="p.name"></span>
-                    <span class="text-slate-500 text-sm" x-text="' · '+(p.host||'')"></span></div>
-                  <button @click="delProvider(p.id)" class="text-red-400 text-sm hover:text-red-300">Delete</button>
+                <div class="flex items-center justify-between py-2.5 border-b border-slate-800/50">
+                  <div class="flex items-center gap-3">
+                    <span class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center">🔌</span>
+                    <div><span class="font-medium" x-text="p.name"></span>
+                      <span class="text-slate-500 text-sm" x-text="' · '+(p.host||'')"></span></div></div>
+                  <button @click="delProvider(p.id)" class="text-slate-500 hover:text-red-400 text-sm">Delete</button>
                 </div></template>
-              <p x-show="providers.length===0" class="text-sm text-slate-500">No SIP providers yet.</p>
-              <p class="text-xs text-slate-500 mt-3">💡 Leave username/password blank for an IP-based trunk (give the provider your server IP). After adding/removing, run <code>bash selfhosted/scripts/apply-trunks.sh</code> on the server to push trunks to Asterisk.</p>
+              <div x-show="providers.length===0" class="text-sm text-slate-500 text-center py-8">No SIP providers yet.</div>
+              <p class="text-xs text-slate-500 mt-4 bg-slate-800/40 rounded-lg p-3">💡 Leave username/password blank for an IP-based trunk (give the provider your server IP). After changes, run <code class="text-brand-400">bash selfhosted/scripts/apply-trunks.sh</code> on the server.</p>
             </div>
           </template>
 
           <!-- ===== VOICE / TTS ===== -->
           <template x-if="view==='voice'">
-            <div class="card p-4 space-y-3">
-              <div><label class="block text-sm text-slate-400 mb-1">TTS provider</label>
+            <div class="card p-5 space-y-4 max-w-lg">
+              <div><label class="block text-xs font-medium text-slate-400 mb-1.5">TTS PROVIDER</label>
                 <select x-model="settings.tts_provider" class="inp">
-                  <option value="gtts">gtts (free, EN+SI)</option>
-                  <option value="google">google (Cloud, best quality)</option>
-                  <option value="piper">piper (offline, EN)</option>
+                  <option value="gtts">gtts — free, English + Sinhala</option>
+                  <option value="google">google — Cloud, best quality</option>
+                  <option value="piper">piper — offline, English</option>
                 </select></div>
-              <div><label class="block text-sm text-slate-400 mb-1">English voice</label>
+              <div><label class="block text-xs font-medium text-slate-400 mb-1.5">ENGLISH VOICE</label>
                 <input x-model="settings.tts_voice_en" class="inp" placeholder="en-US-Standard-C" /></div>
-              <div><label class="block text-sm text-slate-400 mb-1">Sinhala voice</label>
+              <div><label class="block text-xs font-medium text-slate-400 mb-1.5">SINHALA VOICE</label>
                 <input x-model="settings.tts_voice_si" class="inp" placeholder="si-LK-Standard-A" /></div>
               <button @click="saveSettings(['tts_provider','tts_voice_en','tts_voice_si'])" class="btn">Save voice settings</button>
               <p class="text-xs text-slate-500">Stored per company. Restart the voice server to apply live.</p>
             </div>
           </template>
 
-          <!-- ===== KNOWLEDGE BASE ===== -->
+          <!-- ===== KNOWLEDGE ===== -->
           <template x-if="view==='knowledge'">
-            <div class="card p-4">
-              <form @submit.prevent="addKnowledge()" class="space-y-2 mb-4">
+            <div class="card p-5">
+              <form @submit.prevent="addKnowledge()" class="space-y-2.5 mb-5">
                 <input x-model="f.kb.title" placeholder="Title (e.g. Opening hours)" required class="inp" />
                 <textarea x-model="f.kb.content" placeholder="Content the assistant can use…" rows="3" required class="inp"></textarea>
-                <button class="btn">Add entry</button>
+                <button class="btn">+ Add entry</button>
               </form>
               <template x-for="k in knowledge" :key="k.id">
-                <div class="py-2 border-b border-slate-800/60">
+                <div class="py-3 border-b border-slate-800/50">
                   <div class="flex items-center justify-between">
                     <span class="font-medium" x-text="k.title"></span>
-                    <button @click="delKnowledge(k.id)" class="text-red-400 text-sm hover:text-red-300">Delete</button></div>
+                    <button @click="delKnowledge(k.id)" class="text-slate-500 hover:text-red-400 text-sm">Delete</button></div>
                   <p class="text-sm text-slate-400 mt-1" x-text="k.content"></p>
                 </div></template>
-              <p x-show="knowledge.length===0" class="text-sm text-slate-500">No knowledge entries yet.</p>
+              <div x-show="knowledge.length===0" class="text-sm text-slate-500 text-center py-8">No knowledge entries yet.</div>
             </div>
           </template>
 
-          <!-- ===== SETTINGS (persona, API, webhooks) ===== -->
+          <!-- ===== SETTINGS ===== -->
           <template x-if="view==='settings'">
-            <div class="space-y-6">
-              <div class="card p-4 space-y-3">
-                <div class="text-sm font-medium">Company & AI persona</div>
+            <div class="space-y-6 max-w-lg">
+              <div class="card p-5 space-y-3">
+                <div class="text-sm font-semibold">Company &amp; AI persona</div>
                 <input x-model="f.company.name" class="inp" placeholder="Company name" />
                 <textarea x-model="f.company.system_prompt" rows="4" class="inp" placeholder="AI persona / system prompt…"></textarea>
                 <button @click="saveCompany()" class="btn">Save</button>
               </div>
-              <div class="card p-4 space-y-3">
-                <div class="text-sm font-medium">API & Webhooks</div>
-                <label class="block text-sm text-slate-400">Webhook URL (call events)</label>
+              <div class="card p-5 space-y-3">
+                <div class="text-sm font-semibold">API &amp; Webhooks</div>
+                <label class="block text-xs font-medium text-slate-400">WEBHOOK URL (call events)</label>
                 <input x-model="settings.webhook_url" class="inp" placeholder="https://your-system.com/webhook" />
-                <label class="block text-sm text-slate-400">External API key</label>
+                <label class="block text-xs font-medium text-slate-400">EXTERNAL API KEY</label>
                 <input x-model="settings.api_key" class="inp" placeholder="optional integration key" />
                 <button @click="saveSettings(['webhook_url','api_key'])" class="btn">Save</button>
               </div>
@@ -237,17 +293,20 @@
       </div>
 
       <!-- Transcript modal -->
-      <div x-show="selectedCall" @click.self="selectedCall=null" class="fixed inset-0 z-40 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div x-show="selectedCall" x-transition.opacity @click.self="selectedCall=null" class="fixed inset-0 z-40 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4">
         <div class="w-full sm:max-w-lg card rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col">
-          <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-            <div class="font-medium">Transcript</div>
-            <button @click="selectedCall=null" class="text-slate-400 hover:text-white">✕</button></div>
-          <div class="p-4 overflow-y-auto space-y-3">
+          <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
+            <div><div class="font-semibold">Transcript</div>
+              <div class="text-xs text-slate-500" x-text="(selectedCall?.caller||'Unknown')+' · '+fmtDur(selectedCall?.duration_seconds)"></div></div>
+            <button @click="selectedCall=null" class="text-slate-400 hover:text-white text-lg">✕</button></div>
+          <div class="p-5 overflow-y-auto space-y-3">
             <template x-for="(m,i) in (selectedCall?.messages||[])" :key="i">
               <div :class="m.role==='user'?'text-left':'text-right'">
-                <div class="inline-block px-3 py-2 rounded-2xl max-w-[80%] text-sm" :class="m.role==='user'?'bg-slate-800':'bg-indigo-500/80'" x-text="m.text"></div></div>
+                <div class="inline-block px-3.5 py-2 rounded-2xl max-w-[80%] text-sm"
+                     :class="m.role==='user'?'bg-slate-800':'text-white'"
+                     :style="m.role!=='user' ? 'background:linear-gradient(135deg,#6366f1,#4f46e5)' : ''" x-text="m.text"></div></div>
             </template>
-            <p x-show="(selectedCall?.messages||[]).length===0" class="text-slate-500 text-sm">No transcript.</p>
+            <div x-show="(selectedCall?.messages||[]).length===0" class="text-slate-500 text-sm text-center py-6">No transcript.</div>
           </div></div>
       </div>
     </div>
@@ -255,35 +314,58 @@
 </div>
 
 <script>
+const ICON = {
+  overview:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>',
+  calls:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.5-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2z"/></svg>',
+  numbers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg>',
+  providers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v6M15 2v6M7 8h10v3a5 5 0 0 1-10 0zM12 16v6"/></svg>',
+  voice:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>',
+  knowledge:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+  settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+};
 function app() {
   return {
     token: localStorage.getItem('token') || '',
-    me: null, loginForm: { email:'', password:'' }, error:'',
-    view: 'overview', sidebar: false,
+    me: null, loginForm: { email:'', password:'' }, error:'', busy:false,
+    view: 'overview', sidebar: false, loading:false,
     menu: [
-      {id:'overview', label:'Overview', icon:'📊'},
-      {id:'calls', label:'Calls', icon:'📞'},
-      {id:'numbers', label:'Phone Numbers', icon:'#️⃣'},
-      {id:'providers', label:'SIP Providers', icon:'🔌'},
-      {id:'voice', label:'Voice & TTS', icon:'🔊'},
-      {id:'knowledge', label:'Knowledge Base', icon:'📚'},
-      {id:'settings', label:'Settings', icon:'⚙️'},
+      {id:'overview', label:'Overview', sub:'Stats & live activity', icon:ICON.overview},
+      {id:'calls', label:'Calls', sub:'History & transcripts', icon:ICON.calls},
+      {id:'numbers', label:'Phone Numbers', sub:'Manage your DIDs', icon:ICON.numbers},
+      {id:'providers', label:'SIP Providers', sub:'Carrier connections', icon:ICON.providers},
+      {id:'voice', label:'Voice & TTS', sub:'Speech settings', icon:ICON.voice},
+      {id:'knowledge', label:'Knowledge Base', sub:'Train your assistant', icon:ICON.knowledge},
+      {id:'settings', label:'Settings', sub:'Company, API & webhooks', icon:ICON.settings},
+    ],
+    cards: [
+      {l:'Active calls', k:'active_calls', bg:'background:rgba(16,185,129,.15);color:#34d399', icon:'🟢'},
+      {l:'Calls today', k:'today_calls', bg:'background:rgba(99,102,241,.15);color:#818cf8', icon:'📅'},
+      {l:'Total calls', k:'total_calls', bg:'background:rgba(56,189,248,.15);color:#38bdf8', icon:'📞'},
+      {l:'Total minutes', k:'total_minutes', bg:'background:rgba(245,158,11,.15);color:#fbbf24', icon:'⏱️'},
     ],
     stats:{}, calls:[], numbers:[], providers:[], knowledge:[], settings:{},
     liveFeed:[], selectedCall:null, ws:null, wsConnected:false, chart:null, feedId:0,
+    toasts:[], toastId:0,
     f:{ number:{number:'',label:'',provider:''}, provider:{name:'',host:'',username:'',password:'',notes:''},
         kb:{title:'',content:''}, company:{name:'',system_prompt:''} },
+
+    get initials(){ return (this.me?.email||'?').slice(0,2).toUpperCase(); },
 
     async init(){ if(this.token) await this.loadCore(); },
     H(){ return {'Authorization':'Bearer '+this.token,'Content-Type':'application/json'}; },
     async api(path, opts={}){ const r = await fetch(path,{headers:this.H(),...opts});
-      if(r.status===401){ this.logout(); throw 'unauth'; } return r; },
+      if(r.status===401){ this.logout(); throw new Error('unauth'); } return r; },
+    toast(msg, type='success'){ const id=++this.toastId; this.toasts.push({id,msg,type});
+      setTimeout(()=>{ this.toasts=this.toasts.filter(t=>t.id!==id); }, 3200); },
 
-    async login(){ this.error='';
-      const r = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.loginForm)});
-      if(!r.ok){ this.error='Wrong email or password'; return; }
-      this.token=(await r.json()).access_token; localStorage.setItem('token',this.token); await this.loadCore(); },
-    logout(){ localStorage.removeItem('token'); if(this.ws)this.ws.close(); this.token=''; this.me=null; },
+    async login(){ this.error=''; this.busy=true;
+      try{
+        const r = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.loginForm)});
+        if(!r.ok){ this.error='Wrong email or password'; return; }
+        this.token=(await r.json()).access_token; localStorage.setItem('token',this.token); await this.loadCore();
+      } finally { this.busy=false; }
+    },
+    logout(){ localStorage.removeItem('token'); if(this.ws){try{this.ws.close()}catch(e){}} this.token=''; this.me=null; this.view='overview'; },
 
     async loadCore(){
       this.me = await (await this.api('/api/me')).json();
@@ -291,49 +373,53 @@ function app() {
       this.f.company.system_prompt = this.me.company.system_prompt || '';
       await this.go('overview'); this.connectWS();
     },
-    async go(v){ this.view=v; this.sidebar=false;
-      if(v==='overview'){ await this.refreshStats(); }
-      if(v==='calls') this.calls = await (await this.api('/api/calls')).json();
-      if(v==='numbers') this.numbers = await (await this.api('/api/numbers')).json();
-      if(v==='providers') this.providers = await (await this.api('/api/providers')).json();
-      if(v==='knowledge') this.knowledge = await (await this.api('/api/knowledge')).json();
-      if(v==='voice'||v==='settings') this.settings = await (await this.api('/api/settings')).json();
+    async go(v){ this.view=v; this.sidebar=false; this.loading=true;
+      try{
+        if(v==='overview'){ this.stats = await (await this.api('/api/stats')).json(); this.$nextTick(()=>this.renderChart()); }
+        if(v==='calls') this.calls = await (await this.api('/api/calls')).json();
+        if(v==='numbers') this.numbers = await (await this.api('/api/numbers')).json();
+        if(v==='providers') this.providers = await (await this.api('/api/providers')).json();
+        if(v==='knowledge') this.knowledge = await (await this.api('/api/knowledge')).json();
+        if(v==='voice'||v==='settings') this.settings = await (await this.api('/api/settings')).json();
+      } catch(e){ /* 401 handled */ } finally { this.loading=false; }
     },
-    async refreshStats(){ this.stats = await (await this.api('/api/stats')).json(); this.$nextTick(()=>this.renderChart()); },
+    async refreshStats(){ try{ this.stats = await (await this.api('/api/stats')).json(); if(this.view==='overview') this.$nextTick(()=>this.renderChart()); }catch(e){} },
 
-    async addNumber(){ const r=await this.api('/api/numbers',{method:'POST',body:JSON.stringify(this.f.number)});
-      if(r.ok){ this.f.number={number:'',label:'',provider:''}; this.go('numbers'); } else alert('Admin only'); },
-    async delNumber(id){ await this.api('/api/numbers/'+id,{method:'DELETE'}); this.go('numbers'); },
-    async addProvider(){ const r=await this.api('/api/providers',{method:'POST',body:JSON.stringify(this.f.provider)});
-      if(r.ok){ this.f.provider={name:'',host:'',username:'',password:'',notes:''}; this.go('providers'); } else alert('Admin only'); },
-    async delProvider(id){ await this.api('/api/providers/'+id,{method:'DELETE'}); this.go('providers'); },
-    async addKnowledge(){ const r=await this.api('/api/knowledge',{method:'POST',body:JSON.stringify(this.f.kb)});
-      if(r.ok){ this.f.kb={title:'',content:''}; this.go('knowledge'); } else alert('Admin only'); },
-    async delKnowledge(id){ await this.api('/api/knowledge/'+id,{method:'DELETE'}); this.go('knowledge'); },
-    async saveCompany(){ const r=await this.api('/api/company',{method:'PATCH',body:JSON.stringify(this.f.company)});
-      if(r.ok){ this.me.company.name=this.f.company.name; alert('Saved'); } else alert('Admin only'); },
-    async saveSettings(keys){ for(const k of keys){ await this.api('/api/settings',{method:'PUT',body:JSON.stringify({key:k,value:this.settings[k]??''})}); } alert('Saved'); },
+    async addNumber(){ try{ const r=await this.api('/api/numbers',{method:'POST',body:JSON.stringify(this.f.number)});
+      if(r.ok){ this.f.number={number:'',label:'',provider:''}; this.toast('Number added'); this.go('numbers'); } else this.toast('Admin only','error'); }catch(e){} },
+    async delNumber(id){ try{ await this.api('/api/numbers/'+id,{method:'DELETE'}); this.toast('Number removed'); this.go('numbers'); }catch(e){} },
+    async addProvider(){ try{ const r=await this.api('/api/providers',{method:'POST',body:JSON.stringify(this.f.provider)});
+      if(r.ok){ this.f.provider={name:'',host:'',username:'',password:'',notes:''}; this.toast('Provider added'); this.go('providers'); } else this.toast('Admin only','error'); }catch(e){} },
+    async delProvider(id){ try{ await this.api('/api/providers/'+id,{method:'DELETE'}); this.toast('Provider removed'); this.go('providers'); }catch(e){} },
+    async addKnowledge(){ try{ const r=await this.api('/api/knowledge',{method:'POST',body:JSON.stringify(this.f.kb)});
+      if(r.ok){ this.f.kb={title:'',content:''}; this.toast('Entry added'); this.go('knowledge'); } else this.toast('Admin only','error'); }catch(e){} },
+    async delKnowledge(id){ try{ await this.api('/api/knowledge/'+id,{method:'DELETE'}); this.toast('Entry removed'); this.go('knowledge'); }catch(e){} },
+    async saveCompany(){ try{ const r=await this.api('/api/company',{method:'PATCH',body:JSON.stringify(this.f.company)});
+      if(r.ok){ this.me.company.name=this.f.company.name; this.toast('Saved'); } else this.toast('Admin only','error'); }catch(e){} },
+    async saveSettings(keys){ try{ for(const k of keys){ await this.api('/api/settings',{method:'PUT',body:JSON.stringify({key:k,value:this.settings[k]??''})}); } this.toast('Saved'); }catch(e){ this.toast('Admin only','error'); } },
 
-    async openCall(id){ this.selectedCall = await (await this.api('/api/calls/'+id)).json(); },
+    async openCall(id){ try{ this.selectedCall = await (await this.api('/api/calls/'+id)).json(); }catch(e){} },
 
     connectWS(){ const p=location.protocol==='https:'?'wss':'ws';
-      this.ws=new WebSocket(`${p}://${location.host}/ws/live?token=${this.token}`);
+      try{ this.ws=new WebSocket(`${p}://${location.host}/ws/live?token=${this.token}`); }catch(e){ return; }
       this.ws.onopen=()=>this.wsConnected=true;
       this.ws.onclose=()=>{ this.wsConnected=false; setTimeout(()=>{if(this.token)this.connectWS();},3000); };
-      this.ws.onmessage=(e)=>this.onLive(JSON.parse(e.data)); },
+      this.ws.onmessage=(e)=>{ try{ this.onLive(JSON.parse(e.data)); }catch(err){} }; },
     onLive(m){
-      if(m.event==='call_started'){ this.pushFeed(`📞 Incoming ${m.call.caller||''}`); if(this.view==='overview')this.refreshStats(); if(this.view==='calls')this.go('calls'); }
+      if(m.event==='call_started'){ this.pushFeed(`📞 Incoming ${m.call.caller||''}`); this.refreshStats(); if(this.view==='calls')this.go('calls'); }
       else if(m.event==='message'){ this.pushFeed(`${m.role==='user'?'🎙️ Caller':'🤖 AI'}: ${m.text}`);
         if(this.selectedCall&&this.selectedCall.id===m.call_id) this.selectedCall.messages.push({role:m.role,text:m.text}); }
-      else if(m.event==='call_ended'){ this.pushFeed('✅ Call ended'); if(this.view==='overview')this.refreshStats(); if(this.view==='calls')this.go('calls'); }
+      else if(m.event==='call_ended'){ this.pushFeed('✅ Call ended'); this.refreshStats(); if(this.view==='calls')this.go('calls'); }
     },
     pushFeed(t){ this.liveFeed.unshift({id:++this.feedId,text:t}); if(this.liveFeed.length>30)this.liveFeed.pop(); },
 
     renderChart(){ const ctx=document.getElementById('chart'); if(!ctx||!this.stats.series)return;
+      if(this.chart){ this.chart.destroy(); this.chart=null; }   // avoid stale canvas
       const labels=this.stats.series.map(s=>s.date.slice(5)), data=this.stats.series.map(s=>s.count);
-      if(this.chart){ this.chart.data.labels=labels; this.chart.data.datasets[0].data=data; this.chart.update(); return; }
-      this.chart=new Chart(ctx,{type:'line',data:{labels,datasets:[{data,borderColor:'#818cf8',backgroundColor:'rgba(129,140,248,.15)',fill:true,tension:.35,pointRadius:3}]},
-        options:{plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e293b'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#1e293b'},ticks:{color:'#94a3b8',precision:0}}}}}); },
+      const g=ctx.getContext('2d').createLinearGradient(0,0,0,150);
+      g.addColorStop(0,'rgba(129,140,248,.35)'); g.addColorStop(1,'rgba(129,140,248,0)');
+      this.chart=new Chart(ctx,{type:'line',data:{labels,datasets:[{data,borderColor:'#818cf8',backgroundColor:g,fill:true,tension:.4,pointRadius:3,pointBackgroundColor:'#818cf8'}]},
+        options:{plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(30,41,59,.6)'},ticks:{color:'#64748b'}},y:{grid:{color:'rgba(30,41,59,.6)'},ticks:{color:'#64748b',precision:0}}}}}); },
 
     fmtDur(s){ s=s||0; const m=Math.floor(s/60),r=s%60; return `${m}:${String(r).padStart(2,'0')}`; },
     fmtTime(t){ return t?new Date(t).toLocaleString():'–'; },

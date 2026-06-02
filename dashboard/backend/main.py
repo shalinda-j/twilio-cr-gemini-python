@@ -1,6 +1,7 @@
 # main.py - FastAPI dashboard: auth, REST API, live WebSocket, and serves the frontend.
 import datetime
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import (
     Depends,
@@ -40,13 +41,14 @@ from .seed import seed_initial_data
 INGEST_TOKEN = os.getenv("INGEST_TOKEN", "CHANGE_ME_ingest_token")
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
 
-app = FastAPI(title="Voice Assistant Dashboard")
-
-
-@app.on_event("startup")
-def _startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
     seed_initial_data()
+    yield
+
+
+app = FastAPI(title="Voice Assistant Dashboard", lifespan=lifespan)
 
 
 # -----------------------------------------------------------------------------

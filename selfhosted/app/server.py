@@ -28,17 +28,25 @@ def _report(fn, *args):
 
 
 async def speak(writer: asyncio.StreamWriter, tts, text: str, lang: str):
-    """Synthesize text and stream it back to Asterisk, paced at real time."""
+    """Synthesize text and stream it back to Asterisk, paced at real time.
+    Resilient: a TTS hiccup or a dropped connection never crashes the call."""
     if not text:
         return
-    pcm = await asyncio.to_thread(tts.synthesize, text, lang)
-    for i in range(0, len(pcm), C.FRAME_BYTES):
-        chunk = pcm[i : i + C.FRAME_BYTES]
-        if len(chunk) < C.FRAME_BYTES:
-            chunk = chunk + b"\x00" * (C.FRAME_BYTES - len(chunk))
-        writer.write(build_audio_frame(chunk))
-        await writer.drain()
-        await asyncio.sleep(C.FRAME_MS / 1000)  # pace ~20ms per frame
+    try:
+        pcm = await asyncio.to_thread(tts.synthesize, text, lang)
+    except Exception as e:
+        print("❌ TTS error:", repr(e))
+        return
+    try:
+        for i in range(0, len(pcm), C.FRAME_BYTES):
+            chunk = pcm[i : i + C.FRAME_BYTES]
+            if len(chunk) < C.FRAME_BYTES:
+                chunk = chunk + b"\x00" * (C.FRAME_BYTES - len(chunk))
+            writer.write(build_audio_frame(chunk))
+            await writer.drain()
+            await asyncio.sleep(C.FRAME_MS / 1000)  # pace ~20ms per frame
+    except (ConnectionResetError, BrokenPipeError):
+        pass
 
 
 async def handle_connection(reader, writer, stt: STT, llm: LLM, tts):
