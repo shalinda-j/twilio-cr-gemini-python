@@ -175,3 +175,8 @@ cython_debug/
 # Self-hosted secrets
 selfhosted/gcp-key.json
 selfhosted/voices/
+
+# Dashboard
+dashboard/.venv/
+dashboard/data/
+selfhosted/dashboard-data/

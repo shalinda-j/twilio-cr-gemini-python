@@ -4,8 +4,11 @@
 #
 # Turn-based v1: we listen until the caller stops, answer, then listen again.
 import asyncio
+import time
+import uuid
 
 from . import config as C
+from . import reporting
 from .audiosocket import (
     TYPE_AUDIO,
     TYPE_HANGUP,
@@ -17,6 +20,11 @@ from .llm import LLM
 from .stt import STT
 from .tts import make_tts
 from .vad import UtteranceDetector
+
+
+def _report(fn, *args):
+    """Fire-and-forget event to the dashboard (never blocks the call)."""
+    asyncio.create_task(asyncio.to_thread(fn, *args))
 
 
 async def speak(writer: asyncio.StreamWriter, tts, text: str, lang: str):
@@ -41,6 +49,9 @@ async def handle_connection(reader, writer, stt: STT, llm: LLM, tts):
         C.SILENCE_MS_END, C.MIN_SPEECH_MS,
     )
     chat = llm.new_session()
+    call_uuid = str(uuid.uuid4())
+    started_at = time.monotonic()
+    _report(reporting.call_started, call_uuid, None)
 
     try:
         await speak(writer, tts, C.WELCOME_GREETING, "en")
@@ -55,7 +66,7 @@ async def handle_connection(reader, writer, stt: STT, llm: LLM, tts):
             if mtype == TYPE_HANGUP:
                 break
             if mtype == TYPE_UUID:
-                print(f"📞 Call UUID: {payload.hex()}")
+                print(f"📞 Channel UUID: {payload.hex()}")
                 continue
             if mtype != TYPE_AUDIO:
                 continue
@@ -66,18 +77,22 @@ async def handle_connection(reader, writer, stt: STT, llm: LLM, tts):
                 if not text:
                     continue
                 print(f"🎙️  User ({lang}): {text}")
+                _report(reporting.message, call_uuid, "user", text, lang)
                 try:
                     reply = await llm.reply(chat, text)
                 except Exception as e:
                     print("❌ Gemini error:", repr(e))
                     reply = "Sorry, I had trouble with that. Could you please repeat?"
                 print(f"🗣️  Assistant ({lang}): {reply}")
+                _report(reporting.message, call_uuid, "assistant", reply, lang)
                 await speak(writer, tts, reply, lang)
                 detector.reset()  # discard audio captured while we were speaking
 
     except (ConnectionResetError, asyncio.IncompleteReadError):
         pass
     finally:
+        duration = int(time.monotonic() - started_at)
+        _report(reporting.call_ended, call_uuid, "completed", duration)
         try:
             writer.close()
         except Exception:

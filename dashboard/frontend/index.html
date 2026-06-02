@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Assistant Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    [x-cloak]{display:none!important}
+    ::-webkit-scrollbar{width:8px;height:8px}
+    ::-webkit-scrollbar-thumb{background:#334155;border-radius:8px}
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased">
+<div x-data="dashboard()" x-init="init()" x-cloak>
+
+  <!-- ============ LOGIN ============ -->
+  <template x-if="!token">
+    <div class="min-h-screen flex items-center justify-center p-4">
+      <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="h-10 w-10 rounded-xl bg-indigo-500 flex items-center justify-center text-xl">🎙️</div>
+          <h1 class="text-xl font-semibold">Voice Assistant</h1>
+        </div>
+        <form @submit.prevent="login()">
+          <label class="block text-sm text-slate-400 mb-1">Email</label>
+          <input x-model="loginForm.email" type="email" required
+                 class="w-full mb-4 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 focus:border-indigo-500 outline-none" />
+          <label class="block text-sm text-slate-400 mb-1">Password</label>
+          <input x-model="loginForm.password" type="password" required
+                 class="w-full mb-5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 focus:border-indigo-500 outline-none" />
+          <button class="w-full py-2.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 font-medium transition">
+            Sign in
+          </button>
+          <p x-show="error" x-text="error" class="text-red-400 text-sm mt-3"></p>
+        </form>
+      </div>
+    </div>
+  </template>
+
+  <!-- ============ DASHBOARD ============ -->
+  <template x-if="token">
+    <div class="min-h-screen">
+      <!-- Top bar -->
+      <header class="sticky top-0 z-20 bg-slate-900/80 backdrop-blur border-b border-slate-800">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🎙️</span>
+            <span class="font-semibold" x-text="me?.company?.name || 'Dashboard'"></span>
+            <span class="ml-2 inline-flex items-center gap-1 text-xs text-emerald-400">
+              <span class="h-2 w-2 rounded-full" :class="wsConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'"></span>
+              <span x-text="wsConnected ? 'Live' : 'Offline'"></span>
+            </span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-slate-400 hidden sm:inline" x-text="me?.email"></span>
+            <button @click="logout()" class="text-sm px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700">Logout</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+        <!-- Stat cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <template x-for="card in [
+              {label:'Active calls', value: stats.active_calls, accent:'text-emerald-400'},
+              {label:'Calls today', value: stats.today_calls, accent:'text-indigo-400'},
+              {label:'Total calls', value: stats.total_calls, accent:'text-sky-400'},
+              {label:'Total minutes', value: stats.total_minutes, accent:'text-amber-400'}
+            ]" :key="card.label">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div class="text-xs text-slate-400" x-text="card.label"></div>
+              <div class="text-2xl font-bold mt-1" :class="card.accent" x-text="card.value ?? '–'"></div>
+            </div>
+          </template>
+        </div>
+
+        <div class="grid lg:grid-cols-3 gap-6">
+          <!-- Chart -->
+          <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div class="text-sm font-medium mb-3">Calls (last 7 days)</div>
+            <canvas id="callsChart" height="120"></canvas>
+          </div>
+          <!-- Live feed -->
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div class="text-sm font-medium mb-3">Live activity</div>
+            <div class="space-y-2 max-h-64 overflow-y-auto">
+              <template x-for="item in liveFeed" :key="item.id">
+                <div class="text-sm bg-slate-800/60 rounded-lg px-3 py-2">
+                  <span x-text="item.text"></span>
+                </div>
+              </template>
+              <p x-show="liveFeed.length===0" class="text-sm text-slate-500">Waiting for calls…</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Calls table -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-800 text-sm font-medium">Recent calls</div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="text-slate-400 text-left">
+                <tr class="border-b border-slate-800">
+                  <th class="px-4 py-2 font-medium">Caller</th>
+                  <th class="px-4 py-2 font-medium">Status</th>
+                  <th class="px-4 py-2 font-medium hidden sm:table-cell">Lang</th>
+                  <th class="px-4 py-2 font-medium hidden sm:table-cell">Turns</th>
+                  <th class="px-4 py-2 font-medium hidden md:table-cell">Duration</th>
+                  <th class="px-4 py-2 font-medium hidden md:table-cell">Started</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="c in calls" :key="c.id">
+                  <tr class="border-b border-slate-800/60 hover:bg-slate-800/40 cursor-pointer" @click="openCall(c.id)">
+                    <td class="px-4 py-2" x-text="c.caller || 'Unknown'"></td>
+                    <td class="px-4 py-2">
+                      <span class="px-2 py-0.5 rounded-full text-xs"
+                            :class="c.status==='in_progress' ? 'bg-emerald-500/20 text-emerald-300' : (c.status==='completed' ? 'bg-slate-700 text-slate-300' : 'bg-red-500/20 text-red-300')"
+                            x-text="c.status"></span>
+                    </td>
+                    <td class="px-4 py-2 hidden sm:table-cell uppercase" x-text="c.language || '–'"></td>
+                    <td class="px-4 py-2 hidden sm:table-cell" x-text="c.turns"></td>
+                    <td class="px-4 py-2 hidden md:table-cell" x-text="fmtDur(c.duration_seconds)"></td>
+                    <td class="px-4 py-2 hidden md:table-cell text-slate-400" x-text="fmtTime(c.started_at)"></td>
+                  </tr>
+                </template>
+                <tr x-show="calls.length===0"><td colspan="6" class="px-4 py-6 text-center text-slate-500">No calls yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      <!-- Transcript modal -->
+      <div x-show="selectedCall" @click.self="selectedCall=null"
+           class="fixed inset-0 z-30 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="w-full sm:max-w-lg bg-slate-900 border border-slate-800 rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col">
+          <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+            <div class="font-medium">Transcript</div>
+            <button @click="selectedCall=null" class="text-slate-400 hover:text-white">✕</button>
+          </div>
+          <div class="p-4 overflow-y-auto space-y-3">
+            <template x-for="(m,i) in (selectedCall?.messages||[])" :key="i">
+              <div :class="m.role==='user' ? 'text-left' : 'text-right'">
+                <div class="inline-block px-3 py-2 rounded-2xl max-w-[80%] text-sm"
+                     :class="m.role==='user' ? 'bg-slate-800' : 'bg-indigo-500/80'">
+                  <span x-text="m.text"></span>
+                </div>
+              </div>
+            </template>
+            <p x-show="(selectedCall?.messages||[]).length===0" class="text-slate-500 text-sm">No transcript.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+</div>
+
+<script>
+function dashboard() {
+  return {
+    token: localStorage.getItem('token') || '',
+    me: null,
+    loginForm: { email: '', password: '' },
+    error: '',
+    stats: {}, calls: [], liveFeed: [], selectedCall: null,
+    ws: null, wsConnected: false, chart: null, feedId: 0,
+
+    async init() {
+      if (this.token) await this.loadAll();
+    },
+    headers() { return { 'Authorization': 'Bearer ' + this.token, 'Content-Type': 'application/json' }; },
+
+    async login() {
+      this.error = '';
+      const r = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.loginForm)
+      });
+      if (!r.ok) { this.error = 'Wrong email or password'; return; }
+      const data = await r.json();
+      this.token = data.access_token;
+      localStorage.setItem('token', this.token);
+      await this.loadAll();
+    },
+    logout() {
+      localStorage.removeItem('token');
+      if (this.ws) this.ws.close();
+      this.token = ''; this.me = null;
+    },
+
+    async loadAll() {
+      try {
+        const meR = await fetch('/api/me', { headers: this.headers() });
+        if (meR.status === 401) { this.logout(); return; }
+        this.me = await meR.json();
+        await this.refreshStats();
+        await this.refreshCalls();
+        this.connectWS();
+      } catch (e) { console.error(e); }
+    },
+    async refreshStats() {
+      this.stats = await (await fetch('/api/stats', { headers: this.headers() })).json();
+      this.renderChart();
+    },
+    async refreshCalls() {
+      this.calls = await (await fetch('/api/calls', { headers: this.headers() })).json();
+    },
+    async openCall(id) {
+      this.selectedCall = await (await fetch('/api/calls/' + id, { headers: this.headers() })).json();
+    },
+
+    connectWS() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      this.ws = new WebSocket(`${proto}://${location.host}/ws/live?token=${this.token}`);
+      this.ws.onopen = () => this.wsConnected = true;
+      this.ws.onclose = () => { this.wsConnected = false; setTimeout(() => { if (this.token) this.connectWS(); }, 3000); };
+      this.ws.onmessage = (ev) => this.onLive(JSON.parse(ev.data));
+    },
+    onLive(msg) {
+      if (msg.event === 'call_started') {
+        this.pushFeed(`📞 Incoming call ${msg.call.caller || ''}`);
+        this.refreshCalls(); this.refreshStats();
+      } else if (msg.event === 'message') {
+        const who = msg.role === 'user' ? '🎙️ Caller' : '🤖 Assistant';
+        this.pushFeed(`${who}: ${msg.text}`);
+        if (this.selectedCall && this.selectedCall.id === msg.call_id) {
+          this.selectedCall.messages.push({ role: msg.role, text: msg.text, language: msg.language });
+        }
+      } else if (msg.event === 'call_ended') {
+        this.pushFeed(`✅ Call ended`);
+        this.refreshCalls(); this.refreshStats();
+      }
+    },
+    pushFeed(text) {
+      this.liveFeed.unshift({ id: ++this.feedId, text });
+      if (this.liveFeed.length > 30) this.liveFeed.pop();
+    },
+
+    renderChart() {
+      const ctx = document.getElementById('callsChart');
+      if (!ctx || !this.stats.series) return;
+      const labels = this.stats.series.map(s => s.date.slice(5));
+      const data = this.stats.series.map(s => s.count);
+      if (this.chart) { this.chart.data.labels = labels; this.chart.data.datasets[0].data = data; this.chart.update(); return; }
+      this.chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets: [{ data, borderColor: '#818cf8', backgroundColor: 'rgba(129,140,248,.15)', fill: true, tension: .35, pointRadius: 3 }] },
+        options: { plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } }, y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', precision: 0 } } } }
+      });
+    },
+
+    fmtDur(s) { s = s || 0; const m = Math.floor(s / 60), r = s % 60; return `${m}:${String(r).padStart(2, '0')}`; },
+    fmtTime(t) { return t ? new Date(t).toLocaleString() : '–'; },
+  };
+}
+</script>
+</body>
+</html>
