@@ -5,6 +5,7 @@ import os
 from fastapi import (
     Depends,
     FastAPI,
+    Form,
     Header,
     HTTPException,
     WebSocket,
@@ -53,10 +54,38 @@ class IngestEvent(BaseModel):
     caller: str | None = None
     direction: str | None = "inbound"
     language: str | None = None
+    did: str | None = None        # number the call came in on (for tenant routing)
     role: str | None = None       # for message events
     text: str | None = None       # for message events
     status: str | None = None     # for call_ended
     duration_seconds: int | None = None
+
+
+class CompanyBody(BaseModel):
+    name: str
+    system_prompt: str | None = None
+
+
+class NumberBody(BaseModel):
+    number: str
+    label: str | None = None
+    provider: str | None = None
+    company_id: int | None = None
+
+
+def require_admin(user: User):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+
+def _resolve_company_for_did(db: Session, did: str | None) -> int | None:
+    """Map an inbound DID to the owning company; fall back to the first company."""
+    if did:
+        pn = db.query(PhoneNumber).filter(PhoneNumber.number == did).first()
+        if pn:
+            return pn.company_id
+    first = db.query(Company).order_by(Company.id).first()
+    return first.id if first else None
 
 
 # -----------------------------------------------------------------------------
@@ -188,8 +217,82 @@ def list_numbers(user: User = Depends(get_current_user), db: Session = Depends(g
 
 
 # -----------------------------------------------------------------------------
-# Ingest endpoint - the voice server posts call events here (server-to-server).
+# Admin: manage companies and phone numbers (multi-tenant setup)
 # -----------------------------------------------------------------------------
+@app.post("/api/companies")
+def create_company(
+    body: CompanyBody,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin(user)
+    company = Company(name=body.name, system_prompt=body.system_prompt)
+    db.add(company)
+    db.commit()
+    db.refresh(company)
+    return {"id": company.id, "name": company.name}
+
+
+@app.get("/api/companies")
+def list_companies(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user)
+    return [{"id": c.id, "name": c.name} for c in db.query(Company).all()]
+
+
+@app.post("/api/numbers")
+def create_number(
+    body: NumberBody,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_admin(user)
+    company_id = body.company_id or user.company_id
+    n = PhoneNumber(
+        company_id=company_id,
+        number=body.number.strip(),
+        label=body.label,
+        provider=body.provider,
+    )
+    db.add(n)
+    db.commit()
+    db.refresh(n)
+    return {"id": n.id, "number": n.number, "company_id": n.company_id}
+
+
+# -----------------------------------------------------------------------------
+# Internal: voice/telephony servers post here (server-to-server, token-protected).
+# -----------------------------------------------------------------------------
+@app.post("/api/internal/route")
+async def route_call(
+    call_uuid: str = Form(...),
+    did: str = Form(default=""),
+    caller: str = Form(default=""),
+    token: str = Form(default=""),
+    db: Session = Depends(get_db),
+):
+    """Asterisk registers a call->DID mapping at answer time so we can attribute
+    the call to the right company before the voice server starts reporting."""
+    if token != INGEST_TOKEN:
+        raise HTTPException(status_code=403, detail="Bad ingest token")
+    cid = _resolve_company_for_did(db, did or None)
+    if cid is None:
+        raise HTTPException(status_code=400, detail="No company configured")
+    call = db.query(Call).filter(Call.call_uuid == call_uuid).first()
+    if not call:
+        call = Call(
+            company_id=cid,
+            call_uuid=call_uuid,
+            caller=caller or None,
+            direction="inbound",
+            status="in_progress",
+        )
+        db.add(call)
+        db.commit()
+        db.refresh(call)
+    await hub.broadcast(cid, {"event": "call_started", "call": _call_brief(call)})
+    return {"ok": True, "company_id": cid}
+
+
 @app.post("/api/internal/ingest")
 async def ingest(
     event: IngestEvent,
@@ -199,18 +302,11 @@ async def ingest(
     if x_ingest_token != INGEST_TOKEN:
         raise HTTPException(status_code=403, detail="Bad ingest token")
 
-    # For a single-tenant install we attribute events to the first company.
-    # (Multi-tenant: map by the DID the call came in on.)
-    company = db.query(Company).order_by(Company.id).first()
-    if not company:
+    # A call may already exist (pre-routed by Asterisk to the right company).
+    call = db.query(Call).filter(Call.call_uuid == event.call_uuid).first()
+    cid = call.company_id if call else _resolve_company_for_did(db, event.did)
+    if cid is None:
         raise HTTPException(status_code=400, detail="No company configured")
-    cid = company.id
-
-    call = (
-        db.query(Call)
-        .filter(Call.call_uuid == event.call_uuid, Call.company_id == cid)
-        .first()
-    )
 
     if event.type == "call_started":
         if not call:

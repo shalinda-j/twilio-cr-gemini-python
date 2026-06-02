@@ -68,8 +68,15 @@ Events: `call_started`, `message` (each user/assistant turn), `call_ended`.
 | POST | `/api/internal/ingest` | (server-to-server) call events |
 | WS | `/ws/live?token=…` | live event stream |
 
+## Multi-tenant (DID → company)
+- Admins can create companies (`POST /api/companies`) and assign phone numbers
+  (`POST /api/numbers`, or the **Phone numbers** card in the UI).
+- Telephony registers each inbound call to its DID's company via
+  `POST /api/internal/route` (form: `call_uuid`, `did`, `caller`, `token`) before
+  the AI starts, so each company sees only its own calls.
+- Calls without a known DID (e.g. softphone tests) fall back to the first company.
+
 ## Roadmap (not in v1)
-- Per-number → company routing for true multi-tenant attribution
 - User management UI, roles, audit log
 - Editable per-company AI persona from the dashboard
 - CSV export, search/filter, date ranges

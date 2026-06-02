@@ -100,11 +100,36 @@ Install **Zoiper** (or Linphone) and add an account:
 Once it shows **Registered**, dial **`1000`** and start talking. You should hear the
 greeting, then the AI answers in English or Sinhala depending on how you speak. 🎉
 
-## Step 7 (later) - Connect a real phone number
+## Step 7 - Connect a real phone number (SIP trunk)
 
-Get a SIP trunk + DID from a provider, then add a trunk to `pjsip.conf` and route its
-inbound number to `Goto(ai,1000,1)` in `extensions.conf` (commented example included).
-Reload: `docker compose exec asterisk asterisk -rx "core reload"`.
+1. Buy a **SIP trunk + DID (phone number)** from a provider (local +94 or international wholesale).
+2. In `asterisk/pjsip.conf`, uncomment the **SIP TRUNK** block and fill in the
+   provider's `server`, `username`, `password`.
+3. Reload Asterisk: `docker compose exec asterisk asterisk -rx "pjsip reload"`.
+4. Inbound calls arrive on the dialed DID and are routed by the `_X.` pattern in
+   `extensions.conf` — no extra dialplan needed.
+5. Add the DID in the dashboard (see multi-tenant below) so calls are attributed correctly.
+
+## Step 8 - HTTPS for the dashboard (Caddy)
+
+A `caddy` service is included for automatic Let's Encrypt TLS.
+1. Point a domain's **DNS A record** at the droplet (e.g. `dash.example.com`).
+2. Open ports **80/tcp and 443/tcp** in the firewall.
+3. Set `DASHBOARD_DOMAIN=dash.example.com` in `selfhosted/.env`, then
+   `docker compose up -d`. Visit `https://dash.example.com`.
+   (Leave it unset to serve plain HTTP on `:80` for IP testing.)
+4. Keep port `8000` closed to the public; let Caddy front it.
+
+## Step 9 - Multi-tenant (one server, many companies)
+
+Each inbound DID is mapped to a company:
+1. Log in to the dashboard as admin → **Phone numbers** → add your DID (and assign a company).
+2. When a call comes in, Asterisk POSTs the call → DID → company mapping to the
+   dashboard (`/api/internal/route`) before connecting the AI, so each company
+   only sees its own calls. Softphone test calls (ext 1000, no DID) fall back to
+   the first company.
+
+> Make sure `INGEST_TOKEN` is **identical** in `selfhosted/.env` and `dashboard/.env`.
 
 ---
 

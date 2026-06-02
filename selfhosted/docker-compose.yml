@@ -15,6 +15,10 @@ services:
   asterisk:
     image: andrius/asterisk:latest
     network_mode: host
+    environment:
+      # Used by the dialplan to register inbound calls with the dashboard.
+      - DASHBOARD_URL=http://127.0.0.1:8000
+      - INGEST_TOKEN=${INGEST_TOKEN:-CHANGE_ME_ingest_token}
     volumes:
       - ./asterisk/pjsip.conf:/etc/asterisk/pjsip.conf:ro
       - ./asterisk/extensions.conf:/etc/asterisk/extensions.conf:ro
@@ -23,11 +27,25 @@ services:
       - aiserver
     restart: unless-stopped
 
-  # Web dashboard (login, live calls, transcripts). Open http://DROPLET_IP:8000
+  # Web dashboard (login, live calls, transcripts).
   dashboard:
     build: ../dashboard
     network_mode: host
     env_file: ../dashboard/.env
     volumes:
       - ./dashboard-data:/app/data
+    restart: unless-stopped
+
+  # HTTPS reverse proxy. Set DASHBOARD_DOMAIN for automatic Let's Encrypt TLS.
+  caddy:
+    image: caddy:2
+    network_mode: host
+    environment:
+      - DASHBOARD_DOMAIN=${DASHBOARD_DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy-data:/data
+      - ./caddy-config:/config
+    depends_on:
+      - dashboard
     restart: unless-stopped

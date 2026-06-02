@@ -180,3 +180,5 @@ selfhosted/voices/
 dashboard/.venv/
 dashboard/data/
 selfhosted/dashboard-data/
+selfhosted/caddy-data/
+selfhosted/caddy-config/

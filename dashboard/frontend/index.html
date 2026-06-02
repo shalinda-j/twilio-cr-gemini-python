@@ -98,6 +98,31 @@
           </div>
         </div>
 
+        <!-- Phone numbers -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-sm font-medium">Phone numbers</div>
+          </div>
+          <form @submit.prevent="addNumber()" class="grid sm:grid-cols-4 gap-2 mb-3">
+            <input x-model="newNumber.number" placeholder="DID e.g. 0112000000" required
+                   class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm outline-none focus:border-indigo-500" />
+            <input x-model="newNumber.label" placeholder="Label"
+                   class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm outline-none focus:border-indigo-500" />
+            <input x-model="newNumber.provider" placeholder="Provider"
+                   class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm outline-none focus:border-indigo-500" />
+            <button class="px-3 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-sm font-medium">Add number</button>
+          </form>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="n in numbers" :key="n.id">
+              <span class="px-3 py-1.5 rounded-lg bg-slate-800 text-sm flex items-center gap-2">
+                <span class="font-mono" x-text="n.number"></span>
+                <span class="text-slate-500" x-show="n.label" x-text="'· '+n.label"></span>
+              </span>
+            </template>
+            <p x-show="numbers.length===0" class="text-sm text-slate-500">No numbers yet — add your SIP trunk DID above.</p>
+          </div>
+        </div>
+
         <!-- Calls table -->
         <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div class="px-4 py-3 border-b border-slate-800 text-sm font-medium">Recent calls</div>
@@ -167,7 +192,8 @@ function dashboard() {
     me: null,
     loginForm: { email: '', password: '' },
     error: '',
-    stats: {}, calls: [], liveFeed: [], selectedCall: null,
+    stats: {}, calls: [], numbers: [], liveFeed: [], selectedCall: null,
+    newNumber: { number: '', label: '', provider: '' },
     ws: null, wsConnected: false, chart: null, feedId: 0,
 
     async init() {
@@ -200,6 +226,7 @@ function dashboard() {
         this.me = await meR.json();
         await this.refreshStats();
         await this.refreshCalls();
+        await this.refreshNumbers();
         this.connectWS();
       } catch (e) { console.error(e); }
     },
@@ -209,6 +236,14 @@ function dashboard() {
     },
     async refreshCalls() {
       this.calls = await (await fetch('/api/calls', { headers: this.headers() })).json();
+    },
+    async refreshNumbers() {
+      this.numbers = await (await fetch('/api/numbers', { headers: this.headers() })).json();
+    },
+    async addNumber() {
+      const r = await fetch('/api/numbers', { method: 'POST', headers: this.headers(), body: JSON.stringify(this.newNumber) });
+      if (r.ok) { this.newNumber = { number: '', label: '', provider: '' }; await this.refreshNumbers(); }
+      else { alert('Could not add number (admin only).'); }
     },
     async openCall(id) {
       this.selectedCall = await (await fetch('/api/calls/' + id, { headers: this.headers() })).json();

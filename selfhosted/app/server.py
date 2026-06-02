@@ -49,9 +49,19 @@ async def handle_connection(reader, writer, stt: STT, llm: LLM, tts):
         C.SILENCE_MS_END, C.MIN_SPEECH_MS,
     )
     chat = llm.new_session()
-    call_uuid = str(uuid.uuid4())
+    call_uuid = None
     started_at = time.monotonic()
-    _report(reporting.call_started, call_uuid, None)
+    started_reported = False
+
+    def ensure_started():
+        # Report call_started exactly once, preferring Asterisk's UUID so the
+        # dashboard can match the company it already routed this call to.
+        nonlocal call_uuid, started_reported
+        if call_uuid is None:
+            call_uuid = str(uuid.uuid4())
+        if not started_reported:
+            started_reported = True
+            _report(reporting.call_started, call_uuid, None)
 
     try:
         await speak(writer, tts, C.WELCOME_GREETING, "en")
@@ -66,10 +76,15 @@ async def handle_connection(reader, writer, stt: STT, llm: LLM, tts):
             if mtype == TYPE_HANGUP:
                 break
             if mtype == TYPE_UUID:
-                print(f"📞 Channel UUID: {payload.hex()}")
+                try:
+                    call_uuid = str(uuid.UUID(bytes=payload))
+                except Exception:
+                    call_uuid = payload.hex()
+                print(f"📞 Channel UUID: {call_uuid}")
                 continue
             if mtype != TYPE_AUDIO:
                 continue
+            ensure_started()
 
             for utt in detector.add_audio(payload):
                 text, lang = await asyncio.to_thread(stt.transcribe, utt)
@@ -91,8 +106,9 @@ async def handle_connection(reader, writer, stt: STT, llm: LLM, tts):
     except (ConnectionResetError, asyncio.IncompleteReadError):
         pass
     finally:
-        duration = int(time.monotonic() - started_at)
-        _report(reporting.call_ended, call_uuid, "completed", duration)
+        if call_uuid:
+            duration = int(time.monotonic() - started_at)
+            _report(reporting.call_ended, call_uuid, "completed", duration)
         try:
             writer.close()
         except Exception:
