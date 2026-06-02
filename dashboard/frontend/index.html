@@ -172,7 +172,7 @@
                   <button @click="delProvider(p.id)" class="text-red-400 text-sm hover:text-red-300">Delete</button>
                 </div></template>
               <p x-show="providers.length===0" class="text-sm text-slate-500">No SIP providers yet.</p>
-              <p class="text-xs text-slate-500 mt-3">⚠️ Saved here for reference. To take live calls, also add the trunk in <code>asterisk/pjsip.conf</code> and reload.</p>
+              <p class="text-xs text-slate-500 mt-3">💡 Leave username/password blank for an IP-based trunk (give the provider your server IP). After adding/removing, run <code>bash selfhosted/scripts/apply-trunks.sh</code> on the server to push trunks to Asterisk.</p>
             </div>
           </template>
 

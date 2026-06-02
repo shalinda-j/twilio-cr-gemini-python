@@ -22,6 +22,7 @@ services:
       - INGEST_TOKEN=${INGEST_TOKEN:-CHANGE_ME_ingest_token}
     volumes:
       - ./asterisk/pjsip.conf:/etc/asterisk/pjsip.conf:ro
+      - ./asterisk-generated:/etc/asterisk/generated:ro
       - ./asterisk/extensions.conf:/etc/asterisk/extensions.conf:ro
       - ./asterisk/rtp.conf:/etc/asterisk/rtp.conf:ro
     depends_on:

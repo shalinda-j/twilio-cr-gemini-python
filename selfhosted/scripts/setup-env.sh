@@ -48,6 +48,12 @@ JWT_EXPIRE_HOURS="12"
 INGEST_TOKEN="$INGEST_TOKEN"
 EOF
 
+# Ensure the generated-trunks include exists so Asterisk starts cleanly.
+mkdir -p "$ROOT/asterisk-generated"
+[ -f "$ROOT/asterisk-generated/pjsip_trunks.conf" ] || \
+  echo "; (no SIP providers yet - add them in the dashboard, then run apply-trunks.sh)" \
+  > "$ROOT/asterisk-generated/pjsip_trunks.conf"
+
 echo
 echo "✅ Wrote $ROOT/.env and $DASH/.env (INGEST_TOKEN matched in both)."
 echo "   Dashboard login -> $ADMIN_EMAIL / $ADMIN_PASSWORD"

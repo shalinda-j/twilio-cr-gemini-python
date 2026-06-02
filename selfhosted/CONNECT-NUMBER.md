@@ -3,16 +3,32 @@
 A normal consumer mobile SIM lives on the carrier's GSM network and **cannot plug
 directly into Asterisk/SIP**. You bridge it one of these ways.
 
-## Option A — Call forwarding to a VoIP DID (easiest, no hardware)
+## Connecting a SIP DID — self-service (no manual config editing)
+
+You manage everything from the dashboard, then run one command:
+
+1. Buy a SIP **DID + trunk** from a VoIP provider.
+2. Dashboard → **SIP Providers** → add it:
+   - registration trunk → fill host + username + password
+   - IP-based trunk → fill host only, and give the provider your server's IP
+3. Dashboard → **Phone Numbers** → add the DID (so calls map to the right company).
+4. On the server, apply it:
+   ```bash
+   bash selfhosted/scripts/apply-trunks.sh
+   ```
+   This generates `asterisk-generated/pjsip_trunks.conf` from your providers and reloads
+   Asterisk. Verify: `docker compose exec asterisk asterisk -rx "pjsip show registrations"`.
+5. Call the DID — the assistant answers. Done.
+
+> The `_X.` inbound route already sends any dialed DID to the assistant, so there is no
+> dialplan to edit. (A commented manual trunk template also remains in `pjsip.conf` for reference.)
+
+## Option A — Call forwarding to a VoIP DID (use an existing mobile, no hardware)
 ```
 Caller -> your mobile -> (forward) -> VoIP DID -> Asterisk -> AI
 ```
-1. Buy a SIP-capable **DID** from a VoIP provider (a **local** DID keeps forwarding cheap).
-2. Connect that DID to Asterisk: uncomment the **SIP TRUNK** block in `asterisk/pjsip.conf`,
-   fill in the provider's host/username/password, then
-   `docker compose exec asterisk asterisk -rx "pjsip reload"`.
-3. Add the DID under **Phone Numbers** in the dashboard.
-4. On your mobile, enable **call forwarding** to the VoIP number
+1. Connect a VoIP DID using the self-service steps above (a **local** DID keeps forwarding cheap).
+2. On your mobile, enable **call forwarding** to that VoIP number
    (all calls: dial `**21*<VoIP_NUMBER>#`).
 
 Pros: keep your existing number, zero hardware.
