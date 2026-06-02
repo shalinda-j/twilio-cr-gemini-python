@@ -42,10 +42,12 @@ SILENCE_MS_END = int(os.getenv("SILENCE_MS_END", "800"))        # silence after 
 MIN_SPEECH_MS = int(os.getenv("MIN_SPEECH_MS", "300"))          # ignore blips shorter than this
 
 # -----------------------------
-# TTS (pluggable). "google" = Google Cloud TTS (good Sinhala + English, small cost).
-#                  "piper"  = Piper (free, English good, Sinhala unavailable).
+# TTS (pluggable).
+#   "gtts"   = free Google Translate TTS, no credentials, English + Sinhala (default)
+#   "google" = Google Cloud TTS, best quality, needs a service-account key
+#   "piper"  = Piper offline, free, English only
 # -----------------------------
-TTS_PROVIDER = os.getenv("TTS_PROVIDER", "google")
+TTS_PROVIDER = os.getenv("TTS_PROVIDER", "gtts")
 TTS_VOICE_EN = os.getenv("TTS_VOICE_EN", "en-US-Standard-C")
 TTS_VOICE_SI = os.getenv("TTS_VOICE_SI", "si-LK-Standard-A")
 # Piper (only used when TTS_PROVIDER=piper)

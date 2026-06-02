@@ -182,3 +182,4 @@ dashboard/data/
 selfhosted/dashboard-data/
 selfhosted/caddy-data/
 selfhosted/caddy-config/
+selfhosted/secrets/*.json

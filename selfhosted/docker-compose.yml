@@ -6,10 +6,11 @@ services:
     network_mode: host
     env_file: .env
     environment:
-      # Path inside the container to your Google Cloud service-account key
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-key.json
+      # Only used when TTS_PROVIDER=google. Drop your key at selfhosted/secrets/gcp-key.json
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/gcp-key.json
     volumes:
-      - ./gcp-key.json:/app/gcp-key.json:ro
+      # Mount the secrets DIRECTORY (safe even when empty — no file-as-dir surprise).
+      - ./secrets:/app/secrets:ro
     restart: unless-stopped
 
   asterisk:

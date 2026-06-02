@@ -5,7 +5,9 @@ Runs the **whole platform** — Asterisk + AI voice server + dashboard + HTTPS �
 ## 0. What you need first
 - A DigitalOcean account
 - A **Gemini API key** — https://aistudio.google.com/app/apikey
-- For Sinhala TTS: a **Google Cloud service-account JSON** with the *Text-to-Speech API* enabled
+- TTS works out of the box with **gtts** (free, English + Sinhala, no credentials).
+  For best quality, optionally use **Google Cloud TTS** (a service-account JSON with the
+  *Text-to-Speech API* enabled).
 - (Optional, for real calls) a **SIP trunk + phone number** from a provider
 - (Optional, for HTTPS) a **domain** you can point at the droplet
 
@@ -37,9 +39,10 @@ bash selfhosted/scripts/setup-env.sh
 It asks for your Gemini key, admin login, company name, domain and TTS choice,
 then writes `selfhosted/.env` and `dashboard/.env` with an **identical INGEST_TOKEN**.
 
-For Sinhala TTS, upload your Google Cloud key (from your laptop):
+Default TTS is **gtts** — no key needed. For Google Cloud TTS (`TTS_PROVIDER=google`),
+upload your key into the `secrets/` folder (from your laptop):
 ```bash
-scp gcp-key.json root@YOUR_DROPLET_IP:~/twilio-cr-gemini-python/selfhosted/gcp-key.json
+scp gcp-key.json root@YOUR_DROPLET_IP:~/twilio-cr-gemini-python/selfhosted/secrets/gcp-key.json
 ```
 
 ## 5. Firewall
@@ -89,7 +92,7 @@ Also enable **DigitalOcean weekly snapshots** for the droplet.
 ## Troubleshooting
 | Symptom | Check |
 |---|---|
-| aiserver won't start | `docker compose logs aiserver` — usually missing `GOOGLE_API_KEY` or `gcp-key.json` |
+| aiserver won't start | `docker compose logs aiserver` — usually a missing `GOOGLE_API_KEY` (or, only with `TTS_PROVIDER=google`, a missing `secrets/gcp-key.json`) |
 | Softphone won't register | `docker compose exec asterisk asterisk -rx "pjsip show endpoints"` |
 | No / one-way audio | firewall RTP ports `10000-10100/udp` |
 | Calls not in dashboard | `INGEST_TOKEN` must match in both .env files; `docker compose logs dashboard` |

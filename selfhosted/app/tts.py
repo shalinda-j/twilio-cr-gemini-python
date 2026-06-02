@@ -76,6 +76,41 @@ class PiperTTS:
 
 
 def make_tts():
-    if config.TTS_PROVIDER.lower() == "piper":
+    p = config.TTS_PROVIDER.lower()
+    if p == "piper":
         return PiperTTS()
-    return GoogleTTS()
+    if p == "google":
+        return GoogleTTS()
+    return GTTSProvider()  # default: free, no credentials, English + Sinhala
+
+
+class GTTSProvider:
+    """Free Google Translate TTS. No credentials. English + Sinhala. Good for demos.
+    Returns MP3, which we transcode to 8kHz slin via ffmpeg."""
+
+    def __init__(self):
+        from gtts import gTTS  # lazy import
+        self._gTTS = gTTS
+        print("✅ gTTS ready (free, English + Sinhala, no credentials).")
+
+    def synthesize(self, text: str, lang: str) -> bytes:
+        if not text:
+            return b""
+        import io
+
+        code = "si" if _is_sinhala(lang) else "en"
+        buf = io.BytesIO()
+        self._gTTS(text=text, lang=code).write_to_fp(buf)
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error",
+                "-i", "pipe:0",
+                "-f", "s16le", "-ac", "1", "-ar", str(config.TELEPHONY_SAMPLE_RATE),
+                "pipe:1",
+            ],
+            input=buf.getvalue(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+        return proc.stdout

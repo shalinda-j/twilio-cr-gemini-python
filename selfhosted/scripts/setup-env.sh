@@ -15,7 +15,7 @@ read -rp "Admin email [admin@example.com]: " ADMIN_EMAIL; ADMIN_EMAIL=${ADMIN_EM
 read -rp "Admin password [auto]: " ADMIN_PASSWORD; ADMIN_PASSWORD=${ADMIN_PASSWORD:-$(gen)}
 read -rp "Company name [My Company]: " COMPANY_NAME; COMPANY_NAME=${COMPANY_NAME:-My Company}
 read -rp "Dashboard domain (blank = HTTP on :80): " DASHBOARD_DOMAIN
-read -rp "TTS provider google/piper [google]: " TTS_PROVIDER; TTS_PROVIDER=${TTS_PROVIDER:-google}
+read -rp "TTS provider gtts/google/piper [gtts]: " TTS_PROVIDER; TTS_PROVIDER=${TTS_PROVIDER:-gtts}
 
 # One shared secret used by BOTH services for the ingest channel.
 INGEST_TOKEN=$(gen)
@@ -51,4 +51,4 @@ EOF
 echo
 echo "✅ Wrote $ROOT/.env and $DASH/.env (INGEST_TOKEN matched in both)."
 echo "   Dashboard login -> $ADMIN_EMAIL / $ADMIN_PASSWORD"
-[ "$TTS_PROVIDER" = "google" ] && echo "   NOTE: place your Google Cloud key at selfhosted/gcp-key.json for Sinhala TTS."
+[ "$TTS_PROVIDER" = "google" ] && echo "   NOTE: place your Google Cloud key at selfhosted/secrets/gcp-key.json."
