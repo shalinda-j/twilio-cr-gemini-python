@@ -1,0 +1,24 @@
+# docker-compose.yml - runs the AI server + Asterisk on one droplet.
+# Host networking keeps SIP/RTP and the AudioSocket link simple.
+services:
+  aiserver:
+    build: .
+    network_mode: host
+    env_file: .env
+    environment:
+      # Path inside the container to your Google Cloud service-account key
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-key.json
+    volumes:
+      - ./gcp-key.json:/app/gcp-key.json:ro
+    restart: unless-stopped
+
+  asterisk:
+    image: andrius/asterisk:latest
+    network_mode: host
+    volumes:
+      - ./asterisk/pjsip.conf:/etc/asterisk/pjsip.conf:ro
+      - ./asterisk/extensions.conf:/etc/asterisk/extensions.conf:ro
+      - ./asterisk/rtp.conf:/etc/asterisk/rtp.conf:ro
+    depends_on:
+      - aiserver
+    restart: unless-stopped
