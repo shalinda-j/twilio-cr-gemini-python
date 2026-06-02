@@ -212,19 +212,24 @@
           <template x-if="view==='providers'">
             <div class="card p-5">
               <form @submit.prevent="addProvider()" class="grid sm:grid-cols-2 gap-2.5 mb-5">
+                <select x-model="f.provider.kind" class="inp sm:col-span-2">
+                  <option value="sip">SIP trunk — DID from a VoIP provider</option>
+                  <option value="gateway">GSM gateway / GoIP — your SIM (Sri Lankan mobile)</option>
+                </select>
                 <input x-model="f.provider.name" placeholder="Name (e.g. MyCarrier)" required class="inp" />
-                <input x-model="f.provider.host" placeholder="SIP host (sip.provider.com)" class="inp" />
-                <input x-model="f.provider.username" placeholder="Username (blank = IP-based)" class="inp" />
+                <input x-model="f.provider.host" :placeholder="f.provider.kind==='gateway' ? 'Host (not needed for GoIP)' : 'SIP host (sip.provider.com)'" class="inp" />
+                <input x-model="f.provider.username" :placeholder="f.provider.kind==='gateway' ? 'Username the GoIP registers with' : 'Username (blank = IP-based)'" class="inp" />
                 <input x-model="f.provider.password" type="password" placeholder="Password" class="inp" />
                 <input x-model="f.provider.notes" placeholder="Notes" class="inp sm:col-span-2" />
-                <button class="btn justify-center sm:col-span-2">+ Add provider</button>
+                <button class="btn justify-center sm:col-span-2">+ Add</button>
               </form>
               <template x-for="p in providers" :key="p.id">
                 <div class="flex items-center justify-between py-2.5 border-b border-slate-800/50">
                   <div class="flex items-center gap-3">
-                    <span class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center">🔌</span>
+                    <span class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center" x-text="p.kind==='gateway'?'📟':'🔌'"></span>
                     <div><span class="font-medium" x-text="p.name"></span>
-                      <span class="text-slate-500 text-sm" x-text="' · '+(p.host||'')"></span></div></div>
+                      <span class="text-[11px] px-1.5 py-0.5 rounded ml-1" :class="p.kind==='gateway'?'bg-amber-500/15 text-amber-300':'bg-slate-700 text-slate-300'" x-text="p.kind==='gateway'?'GoIP':'SIP'"></span>
+                      <span class="text-slate-500 text-sm" x-text="p.host?(' · '+p.host):''"></span></div></div>
                   <button @click="delProvider(p.id)" class="text-slate-500 hover:text-red-400 text-sm">Delete</button>
                 </div></template>
               <div x-show="providers.length===0" class="text-sm text-slate-500 text-center py-8">No SIP providers yet.</div>
@@ -346,7 +351,7 @@ function app() {
     stats:{}, calls:[], numbers:[], providers:[], knowledge:[], settings:{},
     liveFeed:[], selectedCall:null, ws:null, wsConnected:false, chart:null, feedId:0,
     toasts:[], toastId:0,
-    f:{ number:{number:'',label:'',provider:''}, provider:{name:'',host:'',username:'',password:'',notes:''},
+    f:{ number:{number:'',label:'',provider:''}, provider:{kind:'sip',name:'',host:'',username:'',password:'',notes:''},
         kb:{title:'',content:''}, company:{name:'',system_prompt:''} },
 
     get initials(){ return (this.me?.email||'?').slice(0,2).toUpperCase(); },
@@ -389,7 +394,7 @@ function app() {
       if(r.ok){ this.f.number={number:'',label:'',provider:''}; this.toast('Number added'); this.go('numbers'); } else this.toast('Admin only','error'); }catch(e){} },
     async delNumber(id){ try{ await this.api('/api/numbers/'+id,{method:'DELETE'}); this.toast('Number removed'); this.go('numbers'); }catch(e){} },
     async addProvider(){ try{ const r=await this.api('/api/providers',{method:'POST',body:JSON.stringify(this.f.provider)});
-      if(r.ok){ this.f.provider={name:'',host:'',username:'',password:'',notes:''}; this.toast('Provider added'); this.go('providers'); } else this.toast('Admin only','error'); }catch(e){} },
+      if(r.ok){ this.f.provider={kind:'sip',name:'',host:'',username:'',password:'',notes:''}; this.toast('Provider added'); this.go('providers'); } else this.toast('Admin only','error'); }catch(e){} },
     async delProvider(id){ try{ await this.api('/api/providers/'+id,{method:'DELETE'}); this.toast('Provider removed'); this.go('providers'); }catch(e){} },
     async addKnowledge(){ try{ const r=await this.api('/api/knowledge',{method:'POST',body:JSON.stringify(this.f.kb)});
       if(r.ok){ this.f.kb={title:'',content:''}; this.toast('Entry added'); this.go('knowledge'); } else this.toast('Admin only','error'); }catch(e){} },

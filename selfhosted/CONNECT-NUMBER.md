@@ -34,17 +34,19 @@ Caller -> your mobile -> (forward) -> VoIP DID -> Asterisk -> AI
 Pros: keep your existing number, zero hardware.
 Cons: the carrier charges for the forwarded leg (use a local DID to minimise this).
 
-## Option B — GSM gateway / GoIP (use the real SIM) — recommended long term
+## Option B — GSM gateway / GoIP (use a real Sri Lankan SIM) — recommended
 ```
 SIM card -> GoIP gateway (hardware) -> SIP -> Asterisk -> AI
 ```
+Now self-service from the dashboard — no manual pjsip editing:
 1. Get a GoIP/Yeastar/Dinstar GSM gateway and insert your SIM (good signal needed).
-2. In the GoIP web UI, set the SIP/VoIP server to `YOUR_DROPLET_IP:5060` and register
-   as user `goip` with a password.
-3. In `asterisk/pjsip.conf`, uncomment the **GSM GATEWAY (GoIP)** block, set the same
-   password, then `pjsip reload`.
-4. Incoming GSM calls now arrive in context `ai` and reach the assistant (extension `1000`
-   / the `_X.` route). Confirm with `asterisk -rx "pjsip show endpoints"` (goip = Available).
+2. Dashboard → **SIP Providers** → Add → type **GSM gateway / GoIP**; set a username
+   (e.g. `goip`) and a password.
+3. On the server: `bash selfhosted/scripts/apply-trunks.sh` (generates the endpoint + reloads).
+4. In the GoIP web UI, set the SIP/VoIP **server = `YOUR_DROPLET_IP:5060`** and register
+   with the same username/password.
+5. Confirm: `docker compose exec asterisk asterisk -rx "pjsip show endpoints"` → the gateway
+   shows **Available**. Incoming GSM calls reach the assistant via context `ai`.
 
 Pros: uses the actual SIM/number, no per-call forwarding fees.
 Cons: hardware + must stay online with signal; some carriers throttle gateway SIMs.

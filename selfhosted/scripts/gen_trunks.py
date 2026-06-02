@@ -35,7 +35,7 @@ def trunk_block(i, p):
     name = f"trunk{i}"
     user, pw = s(p["username"]), s(p["password"])
     register = bool(user and pw)
-    out = [f"; --- {s(p['name'])} ---"]
+    out = [f"; --- {s(p['name'])} (SIP trunk) ---"]
     if register:
         out += [
             f"[{name}-reg]", "type=registration", "transport=transport-udp",
@@ -55,6 +55,32 @@ def trunk_block(i, p):
     return "\n".join(out) + "\n"
 
 
+def gateway_block(i, p):
+    """A GSM gateway / GoIP that REGISTERS to us (your SIM lives in the device).
+    Configure the GoIP with: server = this droplet's IP, and these credentials."""
+    user, pw = s(p["username"]), s(p["password"])
+    if not (user and pw):
+        return ""  # the device needs a username/password to register with
+    name = f"gw{i}"
+    out = [
+        f"; --- {s(p['name'])} (GSM gateway / GoIP) ---",
+        f"[{name}]", "type=endpoint", "transport=transport-udp", "context=ai",
+        "disallow=all", "allow=ulaw", "allow=alaw",
+        f"auth={name}-auth", f"aors={name}-aor", "",
+        f"[{name}-auth]", "type=auth", "auth_type=userpass",
+        f"username={user}", f"password={pw}", "",
+        f"[{name}-aor]", "type=aor", "max_contacts=1", "",
+    ]
+    return "\n".join(out) + "\n"
+
+
+def block_for(i, p):
+    kind = s(p["kind"]).lower()
+    if kind in ("gateway", "goip", "gsm"):
+        return gateway_block(i, p)
+    return trunk_block(i, p)
+
+
 def main():
     text = HEADER
     rows = []
@@ -71,7 +97,7 @@ def main():
 
     count = 0
     for p in rows:
-        block = trunk_block(p["id"], p)
+        block = block_for(p["id"], p)
         if block:
             text += block + "\n"
             count += 1
