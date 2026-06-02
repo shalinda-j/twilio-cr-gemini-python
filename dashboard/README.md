@@ -10,12 +10,19 @@ Voice server  --(call events, server-to-server)-->  Dashboard API  --(WebSocket)
 ```
 
 ## Features
-- 🔐 **Login** with JWT + bcrypt-hashed passwords
-- 🏢 **Company-scoped** data (multi-tenant ready)
-- 🟢 **Live** call feed + transcripts via WebSocket (no refresh)
-- 📊 Stats: active / today / total calls, total minutes, 7-day chart
-- 📝 Per-call transcript (turn by turn, with language)
-- 📱 Modern, fully responsive UI (Tailwind) — works great on phones
+A sidebar console to **manage everything**:
+- 📊 **Overview** — active/today/total calls, total minutes, 7-day chart, live activity
+- 📞 **Calls** — history + per-call transcript (turn by turn, with language)
+- #️⃣ **Phone Numbers** — add/remove DIDs
+- 🔌 **SIP Providers** — store trunk/carrier connections
+- 🔊 **Voice & TTS** — pick TTS provider + per-language voices
+- 📚 **Knowledge Base** — add dataset/FAQ entries
+- ⚙️ **Settings** — company name, AI persona, API key, webhook URL
+
+Plus: 🔐 JWT + bcrypt login · 🏢 company-scoped (multi-tenant) · 🟢 live WebSocket updates · 📱 fully responsive.
+
+> Numbers, call history and the live feed are fully wired. Voice/persona/knowledge
+> settings are stored now and consumed by the live voice path as that wiring lands.
 
 ## Tech
 FastAPI · SQLAlchemy (SQLite default, Postgres-ready) · JWT auth · WebSocket ·

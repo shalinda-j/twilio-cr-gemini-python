@@ -25,7 +25,16 @@ from .auth import (
 )
 from .database import get_db, init_db
 from .events import hub
-from .models import Call, Company, Message, PhoneNumber, User
+from .models import (
+    Call,
+    Company,
+    KnowledgeEntry,
+    Message,
+    PhoneNumber,
+    Provider,
+    Setting,
+    User,
+)
 from .seed import seed_initial_data
 
 INGEST_TOKEN = os.getenv("INGEST_TOKEN", "CHANGE_ME_ingest_token")
@@ -73,6 +82,30 @@ class NumberBody(BaseModel):
     company_id: int | None = None
 
 
+class CompanyUpdate(BaseModel):
+    name: str | None = None
+    system_prompt: str | None = None
+
+
+class ProviderBody(BaseModel):
+    name: str
+    kind: str | None = "sip"
+    host: str | None = None
+    username: str | None = None
+    password: str | None = None
+    notes: str | None = None
+
+
+class SettingBody(BaseModel):
+    key: str
+    value: str | None = None
+
+
+class KnowledgeBody(BaseModel):
+    title: str
+    content: str
+
+
 def require_admin(user: User):
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
@@ -105,7 +138,7 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return {
         "email": user.email,
         "role": user.role,
-        "company": {"id": company.id, "name": company.name},
+        "company": {"id": company.id, "name": company.name, "system_prompt": company.system_prompt},
     }
 
 
@@ -257,6 +290,116 @@ def create_number(
     db.commit()
     db.refresh(n)
     return {"id": n.id, "number": n.number, "company_id": n.company_id}
+
+
+@app.delete("/api/numbers/{number_id}")
+def delete_number(number_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user)
+    n = db.query(PhoneNumber).filter(
+        PhoneNumber.id == number_id, PhoneNumber.company_id == user.company_id
+    ).first()
+    if not n:
+        raise HTTPException(status_code=404, detail="Not found")
+    db.delete(n)
+    db.commit()
+    return {"ok": True}
+
+
+@app.patch("/api/company")
+def update_company(body: CompanyUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user)
+    company = db.query(Company).filter(Company.id == user.company_id).first()
+    if body.name is not None:
+        company.name = body.name
+    if body.system_prompt is not None:
+        company.system_prompt = body.system_prompt
+    db.commit()
+    return {"id": company.id, "name": company.name, "system_prompt": company.system_prompt}
+
+
+# ---- SIP providers ----------------------------------------------------------
+@app.get("/api/providers")
+def list_providers(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = db.query(Provider).filter(Provider.company_id == user.company_id).all()
+    return [
+        {"id": p.id, "name": p.name, "kind": p.kind, "host": p.host,
+         "username": p.username, "notes": p.notes, "active": p.active}
+        for p in rows
+    ]
+
+
+@app.post("/api/providers")
+def create_provider(body: ProviderBody, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user)
+    p = Provider(company_id=user.company_id, name=body.name, kind=body.kind or "sip",
+                 host=body.host, username=body.username, password=body.password, notes=body.notes)
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return {"id": p.id, "name": p.name}
+
+
+@app.delete("/api/providers/{provider_id}")
+def delete_provider(provider_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user)
+    p = db.query(Provider).filter(Provider.id == provider_id, Provider.company_id == user.company_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Not found")
+    db.delete(p)
+    db.commit()
+    return {"ok": True}
+
+
+# ---- Settings (TTS, API keys, webhooks) -------------------------------------
+@app.get("/api/settings")
+def get_settings(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = db.query(Setting).filter(Setting.company_id == user.company_id).all()
+    return {s.key: s.value for s in rows}
+
+
+@app.put("/api/settings")
+def put_setting(body: SettingBody, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user)
+    s = db.query(Setting).filter(
+        Setting.company_id == user.company_id, Setting.key == body.key
+    ).first()
+    if s:
+        s.value = body.value
+    else:
+        s = Setting(company_id=user.company_id, key=body.key, value=body.value)
+        db.add(s)
+    db.commit()
+    return {"key": body.key, "value": body.value}
+
+
+# ---- Knowledge base (dataset) ----------------------------------------------
+@app.get("/api/knowledge")
+def list_knowledge(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = db.query(KnowledgeEntry).filter(KnowledgeEntry.company_id == user.company_id).all()
+    return [{"id": k.id, "title": k.title, "content": k.content} for k in rows]
+
+
+@app.post("/api/knowledge")
+def create_knowledge(body: KnowledgeBody, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user)
+    k = KnowledgeEntry(company_id=user.company_id, title=body.title, content=body.content)
+    db.add(k)
+    db.commit()
+    db.refresh(k)
+    return {"id": k.id, "title": k.title}
+
+
+@app.delete("/api/knowledge/{entry_id}")
+def delete_knowledge(entry_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    require_admin(user)
+    k = db.query(KnowledgeEntry).filter(
+        KnowledgeEntry.id == entry_id, KnowledgeEntry.company_id == user.company_id
+    ).first()
+    if not k:
+        raise HTTPException(status_code=404, detail="Not found")
+    db.delete(k)
+    db.commit()
+    return {"ok": True}
 
 
 # -----------------------------------------------------------------------------

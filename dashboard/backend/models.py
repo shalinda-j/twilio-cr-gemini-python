@@ -82,3 +82,37 @@ class Message(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     call = relationship("Call", back_populates="messages")
+
+
+class Provider(Base):
+    """A SIP trunk / carrier connection a company brings."""
+    __tablename__ = "providers"
+    id = Column(Integer, primary_key=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
+    name = Column(String(120), nullable=False)
+    kind = Column(String(32), default="sip")        # sip | other
+    host = Column(String(255), nullable=True)
+    username = Column(String(120), nullable=True)
+    password = Column(String(255), nullable=True)
+    notes = Column(Text, nullable=True)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Setting(Base):
+    """Flexible company-scoped key/value store (TTS choice, API keys, webhooks…)."""
+    __tablename__ = "settings"
+    id = Column(Integer, primary_key=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
+    key = Column(String(120), nullable=False, index=True)
+    value = Column(Text, nullable=True)
+
+
+class KnowledgeEntry(Base):
+    """A piece of knowledge/dataset that can be fed to the assistant for a company."""
+    __tablename__ = "knowledge"
+    id = Column(Integer, primary_key=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
