@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Voice Assistant Console</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -34,7 +34,10 @@
     @keyframes slideup{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
     .toast{animation:slideup .2s ease-out}
     .lift{transition:.18s}.lift:hover{transform:translateY(-2px);border-color:rgba(99,102,241,.5)}
-    .navi svg{width:100%;height:100%;display:block}
+    nav svg{width:100%;height:100%;display:block}
+    .bottomnav{padding-bottom:env(safe-area-inset-bottom)}
+    @media (max-width:1023px){ aside{padding-bottom:env(safe-area-inset-bottom)} }
+    html{-webkit-tap-highlight-color:transparent}
   </style>
 </head>
 <body class="text-slate-100 antialiased">
@@ -126,7 +129,7 @@
           <button @click="go(view)" class="btn btn-ghost text-slate-300 text-xs">↻ Refresh</button>
         </header>
 
-        <main class="p-4 lg:p-6 space-y-6 max-w-6xl">
+        <main class="p-4 lg:p-6 pb-28 lg:pb-6 space-y-6 max-w-6xl">
 
           <!-- ===== OVERVIEW ===== -->
           <template x-if="view==='overview'">
@@ -162,12 +165,13 @@
           <!-- ===== CALLS ===== -->
           <template x-if="view==='calls'">
             <div class="card overflow-hidden">
-              <div class="overflow-x-auto"><table class="w-full text-sm">
+              <!-- desktop table -->
+              <div class="hidden sm:block overflow-x-auto"><table class="w-full text-sm">
                 <thead class="text-slate-400 text-left text-xs uppercase tracking-wide">
                   <tr class="border-b border-slate-800">
                     <th class="px-5 py-3 font-semibold">Caller</th><th class="px-5 py-3 font-semibold">Status</th>
-                    <th class="px-5 py-3 font-semibold hidden sm:table-cell">Lang</th>
-                    <th class="px-5 py-3 font-semibold hidden sm:table-cell">Turns</th>
+                    <th class="px-5 py-3 font-semibold">Lang</th>
+                    <th class="px-5 py-3 font-semibold">Turns</th>
                     <th class="px-5 py-3 font-semibold hidden md:table-cell">Duration</th>
                     <th class="px-5 py-3 font-semibold hidden md:table-cell">Started</th></tr></thead>
                 <tbody>
@@ -177,13 +181,33 @@
                       <td class="px-5 py-3"><span class="px-2.5 py-1 rounded-full text-xs font-medium"
                           :class="c.status==='in_progress'?'bg-emerald-500/15 text-emerald-300':(c.status==='completed'?'bg-slate-700/60 text-slate-300':'bg-red-500/15 text-red-300')"
                           x-text="c.status==='in_progress'?'live':c.status"></span></td>
-                      <td class="px-5 py-3 hidden sm:table-cell uppercase text-slate-400" x-text="c.language||'–'"></td>
-                      <td class="px-5 py-3 hidden sm:table-cell" x-text="c.turns"></td>
+                      <td class="px-5 py-3 uppercase text-slate-400" x-text="c.language||'–'"></td>
+                      <td class="px-5 py-3" x-text="c.turns"></td>
                       <td class="px-5 py-3 hidden md:table-cell" x-text="fmtDur(c.duration_seconds)"></td>
                       <td class="px-5 py-3 hidden md:table-cell text-slate-400" x-text="fmtTime(c.started_at)"></td>
                     </tr></template>
                   <tr x-show="calls.length===0"><td colspan="6" class="px-5 py-12 text-center text-slate-500">📭 No calls yet</td></tr>
                 </tbody></table></div>
+              <!-- mobile cards -->
+              <div class="sm:hidden divide-y divide-slate-800/50">
+                <template x-for="c in calls" :key="c.id">
+                  <button @click="openCall(c.id)" class="w-full text-left p-4 active:bg-slate-800/40 transition">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="font-medium truncate" x-text="c.caller || 'Unknown'"></span>
+                      <span class="px-2 py-0.5 rounded-full text-xs font-medium shrink-0"
+                        :class="c.status==='in_progress'?'bg-emerald-500/15 text-emerald-300':(c.status==='completed'?'bg-slate-700/60 text-slate-300':'bg-red-500/15 text-red-300')"
+                        x-text="c.status==='in_progress'?'live':c.status"></span>
+                    </div>
+                    <div class="flex items-center gap-3 text-xs text-slate-500 mt-1.5">
+                      <span class="uppercase" x-text="c.language||'–'"></span>
+                      <span x-text="c.turns+' turns'"></span>
+                      <span x-text="fmtDur(c.duration_seconds)"></span>
+                      <span class="ml-auto" x-text="fmtTime(c.started_at)"></span>
+                    </div>
+                  </button>
+                </template>
+                <div x-show="calls.length===0" class="p-10 text-center text-slate-500">📭 No calls yet</div>
+              </div>
             </div>
           </template>
 
@@ -297,6 +321,20 @@
         </main>
       </div>
 
+      <!-- Mobile bottom navigation -->
+      <nav class="lg:hidden fixed bottom-0 inset-x-0 z-30 glass border-t border-slate-800 bottomnav">
+        <div class="grid grid-cols-5">
+          <template x-for="item in menu.filter(m=>m.bottom)" :key="item.id">
+            <button @click="go(item.id)"
+                    class="flex flex-col items-center gap-1 pt-2 pb-1.5 text-[10px] font-medium transition active:scale-90"
+                    :class="view===item.id ? 'text-brand-400' : 'text-slate-500'">
+              <span class="h-5 w-5" x-html="item.icon"></span>
+              <span x-text="item.label.split(' ')[0]"></span>
+            </button>
+          </template>
+        </div>
+      </nav>
+
       <!-- Transcript modal -->
       <div x-show="selectedCall" x-transition.opacity @click.self="selectedCall=null" class="fixed inset-0 z-40 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4">
         <div class="w-full sm:max-w-lg card rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col">
@@ -334,13 +372,13 @@ function app() {
     me: null, loginForm: { email:'', password:'' }, error:'', busy:false,
     view: 'overview', sidebar: false, loading:false,
     menu: [
-      {id:'overview', label:'Overview', sub:'Stats & live activity', icon:ICON.overview},
-      {id:'calls', label:'Calls', sub:'History & transcripts', icon:ICON.calls},
-      {id:'numbers', label:'Phone Numbers', sub:'Manage your DIDs', icon:ICON.numbers},
-      {id:'providers', label:'SIP Providers', sub:'Carrier connections', icon:ICON.providers},
+      {id:'overview', label:'Overview', sub:'Stats & live activity', icon:ICON.overview, bottom:true},
+      {id:'calls', label:'Calls', sub:'History & transcripts', icon:ICON.calls, bottom:true},
+      {id:'numbers', label:'Phone Numbers', sub:'Manage your DIDs', icon:ICON.numbers, bottom:true},
+      {id:'providers', label:'SIP Providers', sub:'Carrier connections', icon:ICON.providers, bottom:true},
       {id:'voice', label:'Voice & TTS', sub:'Speech settings', icon:ICON.voice},
       {id:'knowledge', label:'Knowledge Base', sub:'Train your assistant', icon:ICON.knowledge},
-      {id:'settings', label:'Settings', sub:'Company, API & webhooks', icon:ICON.settings},
+      {id:'settings', label:'Settings', sub:'Company, API & webhooks', icon:ICON.settings, bottom:true},
     ],
     cards: [
       {l:'Active calls', k:'active_calls', bg:'background:rgba(16,185,129,.15);color:#34d399', icon:'🟢'},
