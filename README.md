@@ -1,76 +1,131 @@
-# AI Voice Assistant with Twilio and Google Gemini (Python)
+# AI Voice Assistant — Twilio *or* Self-Hosted (Python + Gemini)
 
-This project creates a AI voice assistant that uses [Twilio Voice](https://www.twilio.com/en-us/voice) and [ConversationRelay](https://www.twilio.com/en-us/products/conversational-ai/conversationrelay), and the [Google Gemini API](https://ai.google.dev/) to engage in two-way conversations over a phone call.
+An AI voice assistant you can **call on the phone** and talk to naturally, powered by the
+[Google Gemini API](https://ai.google.dev/). It speaks **English and Sinhala**.
 
-## Overview
+This repo ships **two ways to run it**, plus a **real-time web dashboard**:
 
-This application allows users to call a Twilio number and interact with an AI assistant powered by Google's `gemini-2.5-flash` model. The assistant will respond to user queries in natural, spoken language.
+| | Telephony | Cost | Effort | Best for |
+|---|---|---|---|---|
+| **A. Twilio** (`main.py`) | Twilio + ConversationRelay | per-minute (managed) | minutes | getting started fast |
+| **B. Self-hosted** (`selfhosted/`) | Asterisk + your SIP trunk | only the SIP trunk | more setup | low cost at volume, full control |
+| **Dashboard** (`dashboard/`) | — | — | — | login, live calls, transcripts, stats |
 
-## Prerequisites
+---
 
-- [Python 3.10+](https://www.python.org/downloads/)
-- A Twilio Account: Sign up for a [free trial here](https://twil.io/try-twilio).
-- A Twilio Number with Voice Capabilities: [Instructions to purchase a number](https://support.twilio.com/hc/en-us/articles/223180928-How-to-Buy-a-Twilio-Phone-Number).
-- A Google AI API Key: Visit [Google AI Studio here](https://aistudio.google.com/) to generate a key for free.
+## Repository layout
 
-## Installation
+```
+.
+├── main.py                # Option A: Twilio ConversationRelay app (managed)
+├── requirements.txt       # deps for the Twilio app
+├── selfhosted/            # Option B: no-Twilio stack (Asterisk + Whisper + Gemini + TTS)
+│   ├── app/               #   async AudioSocket server, VAD, STT, LLM, TTS, reporting
+│   ├── asterisk/          #   pjsip / extensions / rtp configs (softphone + SIP trunk)
+│   ├── Caddyfile          #   automatic HTTPS reverse proxy
+│   ├── docker-compose.yml #   aiserver + asterisk + dashboard + caddy
+│   └── README.md          #   full DigitalOcean + softphone + trunk guide
+└── dashboard/             # Web dashboard (FastAPI + SQLite, JWT auth, live WebSocket)
+    ├── backend/           #   API, auth, models, ingest, multi-tenant routing
+    ├── frontend/          #   responsive UI (Tailwind + Alpine + Chart.js)
+    └── README.md          #   dashboard setup + API reference
+```
 
-1. Clone this repository:
+---
 
-    ``` bash
-    git clone https://github.com/rishabkumar7/twilio-cr-gemini-python
-    cd twilio-cr-gemini-python
-    ```
+## Option A — Twilio (quickest)
 
-2. Install the required dependencies. It's recommended to use a virtual environment.
+Twilio handles the phone call, speech-to-text and text-to-speech; this app just wires in Gemini.
 
-    ``` bash
-    pip install -r requirements.txt
-    ```
+```
+Caller → Twilio (STT/TTS) ⇄ /ws (this app) → Gemini → reply → Twilio speaks it
+```
 
-3. Configure your environment variables by creating a .env file in the root of your project:
+**Prerequisites:** Python 3.10+, a [Twilio account](https://twil.io/try-twilio) + voice number,
+and a [Google AI API key](https://aistudio.google.com/).
 
-    - You can copy the example: cp .env.example .env (if you have one) or create it manually.
-    - Add your keys to the .env file:
+```bash
+pip install -r requirements.txt
+cp .env.example .env          # set GOOGLE_API_KEY and NGROK_URL
+ngrok http 8080               # expose your local server
+python main.py
+```
 
-        ``` bash
-        # .env file
-        GOOGLE_API_KEY="YOUR_GOOGLE_AI_API_KEY_HERE"
-        NGROK_URL="your-ngrok-forwarding-url.ngrok-free.app"
-        ```
+Then point your Twilio number's **"A CALL COMES IN"** webhook at
+`https://<your-ngrok-domain>/twiml` and call the number.
 
-## Usage
+> Want a Sri Lankan / non-Twilio number with this option? See **BYOC** (Bring Your Own
+> Carrier) — connect your own SIP trunk into Twilio. Otherwise use Option B.
 
-1. Start [ngrok](https://ngrok.com/) to expose your local server to the internet on port 8080:
+---
 
-    ``` bash
-    ngrok http 8080
-    ```
+## Option B — Self-hosted (no Twilio)
 
-2. Copy the `https://` forwarding URL from your ngrok terminal and update the NGROK_URL in your `.env` file with the domain part (e.g., your-ngrok-forwarding-url.ngrok-free.app).
-3. Run the application:
+Run the whole pipeline yourself, so the only per-minute cost is your SIP trunk.
 
-    ``` bash
-    python main.py
-    ```
+```
+Phone / Softphone ──SIP──▶ Asterisk ──AudioSocket──▶ Python
+   Python: WebRTC VAD → Whisper STT (EN/SI) → Gemini → TTS → back to the caller
+```
 
-4. Configure your Twilio phone number's voice webhook. In the Twilio console, navigate to your number's settings and under "A CALL COMES IN", set the webhook to your ngrok URL with the `/twiml` endpoint (e.g., https://your-ngrok-forwarding-url.ngrok-free.app/twiml).
-5. Call your Twilio number and start talking to your new Gemini-powered voice assistant!
+- **STT:** faster-whisper (multilingual: English + Sinhala)
+- **LLM:** Gemini
+- **TTS:** pluggable — Google Cloud TTS (natural Sinhala + English) or Piper (free, English)
+- **Telephony:** Asterisk; test instantly with a free softphone, then attach a real number via SIP trunk
 
-## How It Works
+Quick start (on an Ubuntu droplet with Docker):
 
-1. When a user calls the Twilio number, Twilio makes an HTTP request to the /twiml endpoint.
-2. The application returns TwiML, which instructs Twilio to establish a WebSocket connection to the server at /ws.
-3. Voice input from the user is transcribed by Twilio and sent to the server as JSON messages over the WebSocket.
-4. The server sends the transcribed text to the **Google Gemini API** and gets a response.
-5. The AI-generated text response is sent back to Twilio through the WebSocket.
-6. Twilio's built-in Text-to-Speech (TTS) engine converts the text to audio and plays it for the user.
-7. The conversation continues until the call is disconnected.
+```bash
+cd selfhosted
+cp .env.example .env                              # Gemini key, secrets
+cp ../dashboard/.env.example ../dashboard/.env    # dashboard secrets
+docker compose up --build -d
+```
 
-## Project Structure
+Register a softphone (Zoiper/Linphone) to extension `1000` and call it — no real number
+needed to test. **Full step-by-step guide:** [`selfhosted/README.md`](selfhosted/README.md).
 
-- `main.py`: The main application file containing the FastAPI server, WebSocket handler, and **Google Gemini integration**.
+---
 
-- `requirements.txt`: A file listing the Python dependencies.
+## The Dashboard
 
-- `.env`: A file for storing environment variables like your `GOOGLE_API_KEY` and `NGROK_URL`.
+A secure, mobile-responsive dashboard with **live, real-time** updates.
+
+- 🔐 JWT + bcrypt login, **company-scoped** data (multi-tenant)
+- 🟢 Live call feed + transcripts over WebSocket (no refresh)
+- 📊 Stat cards, 7-day chart, recent-calls table, per-call transcript
+- 📱 Modern responsive UI (Tailwind + Alpine + Chart.js, no build step)
+- 📞 Manage phone numbers; each inbound DID is routed to its company
+
+The self-hosted voice server reports `call_started` / `message` / `call_ended` events to the
+dashboard's token-protected ingest endpoint. **Details + API reference:**
+[`dashboard/README.md`](dashboard/README.md).
+
+---
+
+## Production wiring (self-hosted)
+
+- **HTTPS:** a `caddy` service gives automatic Let's Encrypt TLS — set `DASHBOARD_DOMAIN`
+  and point its DNS at the droplet (serves plain HTTP on `:80` when unset).
+- **Real phone number:** uncomment the SIP **trunk** block in `selfhosted/asterisk/pjsip.conf`
+  and add the provider's credentials; inbound DIDs route automatically.
+- **Multi-tenant:** add each DID in the dashboard (assigned to a company); Asterisk maps every
+  inbound call to the right company before the AI answers.
+
+> ⚠️ Keep `INGEST_TOKEN` **identical** in `selfhosted/.env` and `dashboard/.env`, and use
+> long random values for `JWT_SECRET` and `INGEST_TOKEN`.
+
+---
+
+## How to choose
+
+- **Just trying it / lowest effort →** Option A (Twilio).
+- **Lowest per-minute cost at volume, full control, Sri Lankan number via local SIP trunk →**
+  Option B (self-hosted).
+- **Either way**, run the dashboard for live monitoring and transcripts.
+
+## Costs at a glance
+
+- **Twilio:** ConversationRelay + voice + TTS, billed per minute (managed, no servers to run).
+- **Self-hosted:** a droplet (fixed) + SIP trunk minutes (and Google TTS if you use Sinhala).
+  Open-source STT/TTS are free; cost drops as call volume grows and the server cost amortizes.

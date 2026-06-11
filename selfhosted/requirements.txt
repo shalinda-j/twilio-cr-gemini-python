@@ -1,0 +1,8 @@
+google-generativeai
+gtts
+python-dotenv
+faster-whisper
+webrtcvad
+google-cloud-texttospeech
+soxr
+numpy

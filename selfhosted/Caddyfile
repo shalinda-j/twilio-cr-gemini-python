@@ -1,0 +1,10 @@
+# Caddy reverse proxy with automatic HTTPS for the dashboard.
+#
+# Set DASHBOARD_DOMAIN to your domain (e.g. dash.example.com) and point its
+# DNS A record at this droplet — Caddy then gets a Let's Encrypt cert
+# automatically. If DASHBOARD_DOMAIN is unset it serves plain HTTP on :80
+# so you can still test by IP.
+{$DASHBOARD_DOMAIN::80} {
+	encode gzip
+	reverse_proxy 127.0.0.1:8000
+}

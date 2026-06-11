@@ -1,0 +1,2 @@
+# Generated SIP trunks (pjsip_trunks.conf) are written here by apply-trunks.sh.
+# This dir is mounted into Asterisk at /etc/asterisk/generated.

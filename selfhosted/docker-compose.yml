@@ -1,0 +1,53 @@
+# docker-compose.yml - runs the AI server + Asterisk on one droplet.
+# Host networking keeps SIP/RTP and the AudioSocket link simple.
+services:
+  aiserver:
+    build: .
+    network_mode: host
+    env_file: .env
+    environment:
+      # Only used when TTS_PROVIDER=google. Drop your key at selfhosted/secrets/gcp-key.json
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/gcp-key.json
+    volumes:
+      # Mount the secrets DIRECTORY (safe even when empty — no file-as-dir surprise).
+      - ./secrets:/app/secrets:ro
+    restart: unless-stopped
+
+  asterisk:
+    image: andrius/asterisk:latest
+    network_mode: host
+    environment:
+      # Used by the dialplan to register inbound calls with the dashboard.
+      - DASHBOARD_URL=http://127.0.0.1:8000
+      - INGEST_TOKEN=${INGEST_TOKEN:-CHANGE_ME_ingest_token}
+    volumes:
+      - ./asterisk/pjsip.conf:/etc/asterisk/pjsip.conf:ro
+      - ./asterisk-generated:/etc/asterisk/generated:ro
+      - ./asterisk/extensions.conf:/etc/asterisk/extensions.conf:ro
+      - ./asterisk/rtp.conf:/etc/asterisk/rtp.conf:ro
+    depends_on:
+      - aiserver
+    restart: unless-stopped
+
+  # Web dashboard (login, live calls, transcripts).
+  dashboard:
+    build: ../dashboard
+    network_mode: host
+    env_file: ../dashboard/.env
+    volumes:
+      - ./dashboard-data:/app/data
+    restart: unless-stopped
+
+  # HTTPS reverse proxy. Set DASHBOARD_DOMAIN for automatic Let's Encrypt TLS.
+  caddy:
+    image: caddy:2
+    network_mode: host
+    environment:
+      - DASHBOARD_DOMAIN=${DASHBOARD_DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy-data:/data
+      - ./caddy-config:/config
+    depends_on:
+      - dashboard
+    restart: unless-stopped

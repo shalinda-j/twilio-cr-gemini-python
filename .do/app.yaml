@@ -1,0 +1,85 @@
+# DigitalOcean App Platform spec.
+#
+# Deploys the HTTP parts of this project:
+#   * dashboard  - the web dashboard (Dockerfile under dashboard/)
+#   * twilio-app - the Twilio ConversationRelay voice app (main.py, optional)
+# plus a managed PostgreSQL database for the dashboard (App Platform disks are
+# ephemeral, so SQLite would lose data on every redeploy).
+#
+# NOTE: the self-hosted Asterisk voice server (selfhosted/) needs SIP/RTP (UDP)
+# and CANNOT run on App Platform — deploy that on a Droplet instead.
+#
+# Deploy with:  doctl apps create --spec .do/app.yaml
+# (or paste this in the App Platform UI → "Edit your app spec")
+name: voice-assistant
+region: nyc
+
+services:
+  # ---- Web dashboard --------------------------------------------------------
+  - name: dashboard
+    source_dir: /dashboard
+    dockerfile_path: dashboard/Dockerfile
+    github:
+      repo: shalinda-j/twilio-cr-gemini-python
+      branch: claude/project-explanation-FZoN2
+      deploy_on_push: true
+    http_port: 8000
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /health
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}          # injected by the managed DB below
+      - key: JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_A_LONG_RANDOM_STRING
+      - key: INGEST_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_ANOTHER_RANDOM_STRING
+      - key: ADMIN_EMAIL
+        scope: RUN_TIME
+        value: admin@example.com
+      - key: ADMIN_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_A_STRONG_PASSWORD
+      - key: COMPANY_NAME
+        scope: RUN_TIME
+        value: My Company
+
+  # ---- Twilio voice app (optional; remove if you only use the self-hosted path)
+  - name: twilio-app
+    source_dir: /
+    environment_slug: python
+    run_command: python main.py
+    github:
+      repo: shalinda-j/twilio-cr-gemini-python
+      branch: claude/project-explanation-FZoN2
+      deploy_on_push: true
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /health
+    envs:
+      - key: PORT
+        scope: RUN_TIME
+        value: "8080"
+      - key: GOOGLE_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_YOUR_GEMINI_KEY
+      # Set this to the twilio-app's own public domain AFTER the first deploy
+      # (e.g. voice-assistant-xxxxx.ondigitalocean.app), then redeploy.
+      - key: NGROK_URL
+        scope: RUN_TIME
+        value: REPLACE_WITH_APP_PUBLIC_DOMAIN
+
+databases:
+  - name: db
+    engine: PG
+    production: false
