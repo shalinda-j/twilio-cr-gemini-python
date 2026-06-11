@@ -74,10 +74,46 @@ def gateway_block(i, p):
     return "\n".join(out) + "\n"
 
 
+def threecx_block(i, p):
+    """A 3CX PBX sending calls to us over a SIP trunk.
+    Two modes:
+      * username+password set -> the 3CX trunk REGISTERS to this server
+        (in 3CX: 'Register to remote server', registrar = this droplet's IP).
+      * host only -> IP-based: we trust INVITEs coming from the 3CX host/IP
+        (in 3CX: trunk with no registration; give it this droplet's IP).
+    Either way calls land in context `ai` and reach the assistant."""
+    user, pw = s(p["username"]), s(p["password"])
+    host = s(p["host"])
+    name = f"pbx{i}"
+    if user and pw:
+        out = [
+            f"; --- {s(p['name'])} (3CX PBX, registers to us) ---",
+            f"[{name}]", "type=endpoint", "transport=transport-udp", "context=ai",
+            "disallow=all", "allow=ulaw", "allow=alaw",
+            f"auth={name}-auth", f"aors={name}-aor", "",
+            f"[{name}-auth]", "type=auth", "auth_type=userpass",
+            f"username={user}", f"password={pw}", "",
+            f"[{name}-aor]", "type=aor", "max_contacts=2", "",
+        ]
+        return "\n".join(out) + "\n"
+    if host:
+        out = [
+            f"; --- {s(p['name'])} (3CX PBX, IP-based) ---",
+            f"[{name}-aor]", "type=aor", f"contact=sip:{host}", "",
+            f"[{name}]", "type=endpoint", "transport=transport-udp", "context=ai",
+            "disallow=all", "allow=ulaw", "allow=alaw", f"aors={name}-aor", "",
+            f"[{name}-identify]", "type=identify", f"endpoint={name}", f"match={host}", "",
+        ]
+        return "\n".join(out) + "\n"
+    return ""
+
+
 def block_for(i, p):
     kind = s(p["kind"]).lower()
     if kind in ("gateway", "goip", "gsm"):
         return gateway_block(i, p)
+    if kind in ("3cx", "pbx"):
+        return threecx_block(i, p)
     return trunk_block(i, p)
 
 

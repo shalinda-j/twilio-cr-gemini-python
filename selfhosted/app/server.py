@@ -49,6 +49,19 @@ async def speak(writer: asyncio.StreamWriter, tts, text: str, lang: str):
         pass
 
 
+async def drain_stale_audio(reader) -> bool:
+    """Discard audio that queued on the socket while we were speaking, so the
+    assistant never transcribes its own echo / stale frames.
+    Returns False if the call hung up while draining."""
+    try:
+        while True:
+            msg = await asyncio.wait_for(read_message(reader), timeout=0.05)
+            if msg is None or msg[0] == TYPE_HANGUP:
+                return False
+    except asyncio.TimeoutError:
+        return True
+
+
 async def handle_connection(reader, writer, stt: STT, llm: LLM, tts):
     peer = writer.get_extra_info("peername")
     print(f"🔗 New AudioSocket connection from {peer}")
@@ -73,9 +86,10 @@ async def handle_connection(reader, writer, stt: STT, llm: LLM, tts):
 
     try:
         await speak(writer, tts, C.WELCOME_GREETING, "en")
-        detector.reset()  # ignore any audio captured during the greeting
+        alive = await drain_stale_audio(reader)  # ignore audio from during the greeting
+        detector.reset()
 
-        while True:
+        while alive:
             msg = await read_message(reader)
             if msg is None:
                 break
@@ -109,7 +123,10 @@ async def handle_connection(reader, writer, stt: STT, llm: LLM, tts):
                 print(f"🗣️  Assistant ({lang}): {reply}")
                 _report(reporting.message, call_uuid, "assistant", reply, lang)
                 await speak(writer, tts, reply, lang)
-                detector.reset()  # discard audio captured while we were speaking
+                alive = await drain_stale_audio(reader)  # discard echo/stale frames
+                detector.reset()
+                if not alive:
+                    break
 
     except (ConnectionResetError, asyncio.IncompleteReadError):
         pass

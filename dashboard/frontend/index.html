@@ -165,6 +165,11 @@
           <!-- ===== CALLS ===== -->
           <template x-if="view==='calls'">
             <div class="card overflow-hidden">
+              <div class="p-3 border-b border-slate-800/60 flex items-center gap-2">
+                <span class="text-slate-500">🔍</span>
+                <input x-model="q" placeholder="Search caller, status or language…" class="inp !border-0 !bg-transparent !p-1.5" />
+                <span class="text-xs text-slate-500 shrink-0" x-text="filteredCalls.length + ' / ' + calls.length"></span>
+              </div>
               <!-- desktop table -->
               <div class="hidden sm:block overflow-x-auto"><table class="w-full text-sm">
                 <thead class="text-slate-400 text-left text-xs uppercase tracking-wide">
@@ -175,7 +180,7 @@
                     <th class="px-5 py-3 font-semibold hidden md:table-cell">Duration</th>
                     <th class="px-5 py-3 font-semibold hidden md:table-cell">Started</th></tr></thead>
                 <tbody>
-                  <template x-for="c in calls" :key="c.id">
+                  <template x-for="c in filteredCalls" :key="c.id">
                     <tr class="border-b border-slate-800/50 hover:bg-slate-800/40 cursor-pointer transition" @click="openCall(c.id)">
                       <td class="px-5 py-3 font-medium" x-text="c.caller || 'Unknown'"></td>
                       <td class="px-5 py-3"><span class="px-2.5 py-1 rounded-full text-xs font-medium"
@@ -190,7 +195,7 @@
                 </tbody></table></div>
               <!-- mobile cards -->
               <div class="sm:hidden divide-y divide-slate-800/50">
-                <template x-for="c in calls" :key="c.id">
+                <template x-for="c in filteredCalls" :key="c.id">
                   <button @click="openCall(c.id)" class="w-full text-left p-4 active:bg-slate-800/40 transition">
                     <div class="flex items-center justify-between gap-2">
                       <span class="font-medium truncate" x-text="c.caller || 'Unknown'"></span>
@@ -239,10 +244,11 @@
                 <select x-model="f.provider.kind" class="inp sm:col-span-2">
                   <option value="sip">SIP trunk — DID from a VoIP provider</option>
                   <option value="gateway">GSM gateway / GoIP — your SIM (Sri Lankan mobile)</option>
+                  <option value="3cx">3CX PBX — connect your 3CX system to the AI</option>
                 </select>
                 <input x-model="f.provider.name" placeholder="Name (e.g. MyCarrier)" required class="inp" />
-                <input x-model="f.provider.host" :placeholder="f.provider.kind==='gateway' ? 'Host (not needed for GoIP)' : 'SIP host (sip.provider.com)'" class="inp" />
-                <input x-model="f.provider.username" :placeholder="f.provider.kind==='gateway' ? 'Username the GoIP registers with' : 'Username (blank = IP-based)'" class="inp" />
+                <input x-model="f.provider.host" :placeholder="f.provider.kind==='gateway' ? 'Host (not needed for GoIP)' : (f.provider.kind==='3cx' ? '3CX IP (for IP mode, else blank)' : 'SIP host (sip.provider.com)')" class="inp" />
+                <input x-model="f.provider.username" :placeholder="f.provider.kind==='sip' ? 'Username (blank = IP-based)' : 'Username it registers to us with'" class="inp" />
                 <input x-model="f.provider.password" type="password" placeholder="Password" class="inp" />
                 <input x-model="f.provider.notes" placeholder="Notes" class="inp sm:col-span-2" />
                 <button class="btn justify-center sm:col-span-2">+ Add</button>
@@ -250,9 +256,9 @@
               <template x-for="p in providers" :key="p.id">
                 <div class="flex items-center justify-between py-2.5 border-b border-slate-800/50">
                   <div class="flex items-center gap-3">
-                    <span class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center" x-text="p.kind==='gateway'?'📟':'🔌'"></span>
+                    <span class="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center" x-text="p.kind==='gateway'?'📟':(p.kind==='3cx'?'🏢':'🔌')"></span>
                     <div><span class="font-medium" x-text="p.name"></span>
-                      <span class="text-[11px] px-1.5 py-0.5 rounded ml-1" :class="p.kind==='gateway'?'bg-amber-500/15 text-amber-300':'bg-slate-700 text-slate-300'" x-text="p.kind==='gateway'?'GoIP':'SIP'"></span>
+                      <span class="text-[11px] px-1.5 py-0.5 rounded ml-1" :class="p.kind==='gateway'?'bg-amber-500/15 text-amber-300':(p.kind==='3cx'?'bg-purple-500/15 text-purple-300':'bg-slate-700 text-slate-300')" x-text="p.kind==='gateway'?'GoIP':(p.kind==='3cx'?'3CX':'SIP')"></span>
                       <span class="text-slate-500 text-sm" x-text="p.host?(' · '+p.host):''"></span></div></div>
                   <button @click="delProvider(p.id)" class="text-slate-500 hover:text-red-400 text-sm">Delete</button>
                 </div></template>
@@ -386,13 +392,15 @@ function app() {
       {l:'Total calls', k:'total_calls', bg:'background:rgba(56,189,248,.15);color:#38bdf8', icon:'📞'},
       {l:'Total minutes', k:'total_minutes', bg:'background:rgba(245,158,11,.15);color:#fbbf24', icon:'⏱️'},
     ],
-    stats:{}, calls:[], numbers:[], providers:[], knowledge:[], settings:{},
+    stats:{}, calls:[], numbers:[], providers:[], knowledge:[], settings:{}, q:'',
     liveFeed:[], selectedCall:null, ws:null, wsConnected:false, chart:null, feedId:0,
     toasts:[], toastId:0,
     f:{ number:{number:'',label:'',provider:''}, provider:{kind:'sip',name:'',host:'',username:'',password:'',notes:''},
         kb:{title:'',content:''}, company:{name:'',system_prompt:''} },
 
     get initials(){ return (this.me?.email||'?').slice(0,2).toUpperCase(); },
+    get filteredCalls(){ const q=this.q.trim().toLowerCase(); if(!q) return this.calls;
+      return this.calls.filter(c=>((c.caller||'')+' '+(c.status||'')+' '+(c.language||'')).toLowerCase().includes(q)); },
 
     async init(){ if(this.token) await this.loadCore(); },
     H(){ return {'Authorization':'Bearer '+this.token,'Content-Type':'application/json'}; },
