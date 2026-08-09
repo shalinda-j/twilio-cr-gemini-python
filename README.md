@@ -39,6 +39,26 @@ This application allows users to call a Twilio number and interact with an AI as
         NGROK_URL="your-ngrok-forwarding-url.ngrok-free.app"
         ```
 
+## Local Testing
+
+You can check the assistant works before buying a phone number or setting up ngrok. Start the server in one terminal:
+
+``` bash
+python main.py
+```
+
+Then in another, run the test client. It connects to the WebSocket and replays the same messages Twilio would send:
+
+``` bash
+python test_local.py
+```
+
+You should see Gemini answer three questions, the last of which confirms the conversation history is being kept. Pass your own questions as arguments to try something else:
+
+``` bash
+python test_local.py "What is the capital of Sri Lanka?"
+```
+
 ## Usage
 
 1. Start [ngrok](https://ngrok.com/) to expose your local server to the internet on port 8080:
@@ -70,6 +90,8 @@ This application allows users to call a Twilio number and interact with an AI as
 ## Project Structure
 
 - `main.py`: The main application file containing the FastAPI server, WebSocket handler, and **Google Gemini integration**.
+
+- `test_local.py`: A test client that stands in for Twilio, so you can exercise the WebSocket and Gemini integration without a phone call.
 
 - `requirements.txt`: A file listing the Python dependencies.
 
